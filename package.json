@@ -1,0 +1,49 @@
+{
+  "name": "krish-crm",
+  "version": "1.0.0",
+  "description": "Professional Pouch Costing Calculator — Desktop & Web",
+  "homepage": "https://krishpatel143.github.io/krish-crm/",
+  "main": "main.js",
+  "author": "Krish Enterprises",
+  "license": "ISC",
+  "scripts": {
+    "start": "electron .",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win",
+    "build": "electron-builder --mac --win"
+  },
+  "dependencies": {
+    "lowdb": "^7.0.1"
+  },
+  "devDependencies": {
+    "electron": "34.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.krishent.krish-crm",
+    "productName": "Krish-CRM",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "assets/**/*",
+      "node_modules/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.business",
+      "target": ["dmg", "zip"],
+      "icon": "assets/icon.icns"
+    },
+    "win": {
+      "target": ["nsis", "portable"],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
