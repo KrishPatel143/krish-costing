@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "Professional Pouch Costing Calculator — Desktop & Web",
   "homepage": "https://krishpatel143.github.io/krish-crm/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KrishPatel143/krish-costing.git"
+  },
   "main": "main.js",
   "author": "Krish Enterprises",
   "license": "ISC",
@@ -13,6 +17,7 @@
     "build": "electron-builder --mac --win"
   },
   "dependencies": {
+    "electron-updater": "^6.8.3",
     "lowdb": "^7.0.1"
   },
   "devDependencies": {
@@ -34,16 +39,26 @@
     ],
     "mac": {
       "category": "public.app-category.business",
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "icon": "assets/icon.icns"
     },
     "win": {
-      "target": ["nsis", "portable"],
+      "target": [
+        "nsis",
+        "portable"
+      ],
       "icon": "assets/icon.ico"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
-    }
+    },
+    "publish": [
+      "github"
+    ]
   }
 }
+

@@ -1,6 +1,9 @@
-const { app, BrowserWindow, ipcMain, Menu, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, shell, dialog } = require('electron');
 const path = require('path');
 const fs   = require('fs');
+const { autoUpdater } = require('electron-updater');
+
+autoUpdater.autoDownload = false; // Prompt user before downloading
 
 // ── LowDB (ESM) loaded dynamically ──────────────────────────────────────────
 let db, dbData;
@@ -99,6 +102,17 @@ function buildMenu() {
         { role: 'undo' }, { role: 'redo' }, { type: 'separator' },
         { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' },
       ]
+    },
+    {
+      label: 'Help',
+      submenu: [
+        {
+          label: 'Check for Updates...',
+          click: () => {
+            autoUpdater.checkForUpdates();
+          }
+        }
+      ]
     }
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
@@ -161,11 +175,62 @@ ipcMain.handle('db:clearHistory', async () => {
 ipcMain.handle('app:getVersion', () => app.getVersion());
 ipcMain.handle('app:getDbPath', () => dbData);
 
+function setupAutoUpdater() {
+  autoUpdater.on('update-available', (info) => {
+    dialog.showMessageBox({
+      type: 'info',
+      title: 'Update Available',
+      message: `Version ${info.version} is available. Do you want to download it now?`,
+      buttons: ['Yes', 'No']
+    }).then((result) => {
+      if (result.response === 0) {
+        autoUpdater.downloadUpdate();
+        dialog.showMessageBox({
+          type: 'info',
+          title: 'Downloading',
+          message: 'Downloading update in the background...',
+          buttons: ['OK']
+        });
+      }
+    });
+  });
+
+  autoUpdater.on('update-not-available', (info) => {
+    dialog.showMessageBox({
+      type: 'info',
+      title: 'Up to Date',
+      message: 'You are running the latest version.'
+    });
+  });
+
+  autoUpdater.on('error', (err) => {
+    dialog.showMessageBox({
+      type: 'error',
+      title: 'Update Error',
+      message: 'Error while checking for updates:\n' + err.message
+    });
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    dialog.showMessageBox({
+      type: 'info',
+      title: 'Update Ready',
+      message: 'Update downloaded successfully. The application will now restart to install it.',
+      buttons: ['Restart Now', 'Later']
+    }).then((result) => {
+      if (result.response === 0) {
+        autoUpdater.quitAndInstall();
+      }
+    });
+  });
+}
+
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 app.whenReady().then(async () => {
   await initDb();
   buildMenu();
   createWindow();
+  setupAutoUpdater();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
