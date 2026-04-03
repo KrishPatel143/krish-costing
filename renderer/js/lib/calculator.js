@@ -3,7 +3,15 @@
  * @description Pure business-logic for pouch costing. Zero DOM — fully unit-testable.
  */
 
-import { MATERIALS, FLEX_MATERIALS, POUCH_TYPES, PRINT_TYPES } from '../data/materials.js';
+import {
+  MATERIALS,
+  FLEX_MATERIALS,
+  POUCH_TYPES,
+  PRINT_TYPES,
+  FOIL_CLASSIFICATIONS,
+  FOIL_THICKNESS_TO_CLASS,
+  FOIL_PRINTING_GSM,
+} from '../data/materials.js';
 
 // ─── Core primitive ───────────────────────────────────────────────────────────
 
@@ -12,13 +20,90 @@ import { MATERIALS, FLEX_MATERIALS, POUCH_TYPES, PRINT_TYPES } from '../data/mat
  * @param {number} areaSqM   Pouch area in m²
  * @param {number} gsm       Grams per square metre
  * @param {number} ratePerKg ₹ per kg
+ * @param {number} wastagePercent Wastage percentage
  * @returns {{ baseKg: number, wastageKg: number, costPerPouch: number }}
  */
-export function calcMaterial(areaSqM, gsm, ratePerKg) {
+export function calcMaterial(areaSqM, gsm, ratePerKg, wastagePercent = 3) {
   const baseKg = (areaSqM * gsm) / 1000;
-  const wastageKg = baseKg * 1.03;
+  const wastageKg = baseKg * (1 + wastagePercent / 100);
   const costPerPouch = wastageKg * ratePerKg;
   return { baseKg, wastageKg, costPerPouch };
+}
+
+/**
+ * Foil costing calculation for one pouch.
+ * @param {{
+ *   materialGroupKey: string,
+ *   thicknessKey: string,
+ *   printType: 'plain' | 'printed',
+ *   gsmByThickness: Record<string, number>,
+ *   rates: { blister: number, aluminium: number, imported: number, ink: number },
+ *   sizeMm: number,
+ *   quantity?: number,
+ *   wastagePercent: number,
+ *   profitPercent: number,
+ * }} p
+ */
+export function calcFoilPouch({
+  materialGroupKey,
+  thicknessKey,
+  printType = 'plain',
+  gsmByThickness,
+  rates,
+  sizeMm,
+  quantity = 1000,
+  wastagePercent,
+  profitPercent,
+}) {
+  const classKey = FOIL_THICKNESS_TO_CLASS[thicknessKey];
+  if (!classKey) throw new Error('Invalid thickness selected.');
+
+  const materialClass = FOIL_CLASSIFICATIONS[classKey];
+  const materialRate = rates[materialClass.rateKey];
+  const materialGsm = gsmByThickness[thicknessKey];
+  const printed = printType === 'printed';
+  const totalGsm = printed ? materialGsm + FOIL_PRINTING_GSM : materialGsm;
+
+  const safeSizeMm = Number.isFinite(sizeMm) && sizeMm > 0 ? sizeMm : 105;
+  const edgeMm = safeSizeMm + 5;
+  const areaMm2 = edgeMm * edgeMm;
+  const areaSqM = areaMm2 / 1_000_000;
+
+  const materialCost = calcMaterial(areaSqM, totalGsm, materialRate, wastagePercent);
+  const inkCost = printed
+    ? calcMaterial(areaSqM, FOIL_PRINTING_GSM, rates.ink, wastagePercent)
+    : { baseKg: 0, wastageKg: 0, costPerPouch: 0 };
+
+  const totalCost = materialCost.costPerPouch + inkCost.costPerPouch;
+  const priceWithProfit = totalCost + (totalCost * profitPercent / 100);
+  const labourPerPouch = safeSizeMm < 60 ? 0.06 : 0.03;
+  const finalPrice = priceWithProfit + labourPerPouch;
+  const finalTotal = finalPrice * quantity;
+
+  return {
+    sizeMm: safeSizeMm,
+    edgeMm,
+    areaMm2,
+    areaSqM,
+    quantity,
+    materialGroupKey,
+    thicknessKey,
+    classKey,
+    classLabel: materialClass.label,
+    materialRateKey: materialClass.rateKey,
+    materialGsm,
+    totalGsm,
+    printed,
+    wastagePercent,
+    profitPercent,
+    materialCost,
+    inkCost,
+    totalCost,
+    priceWithProfit,
+    labourPerPouch,
+    finalPrice,
+    finalTotal,
+  };
 }
 
 // ─── Labour helpers ───────────────────────────────────────────────────────────

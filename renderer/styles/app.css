@@ -110,6 +110,12 @@ body{padding:0}
 .form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;align-items:end}
 .field-group{display:flex;flex-direction:column;gap:6px}
 .ink-options{display:flex;gap:20px;padding-top:2px}
+.foil-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;max-width:760px}
+#foil-group-toggle{margin-bottom:4px}
+#foil-thickness-toggle{display:flex;flex-wrap:wrap;margin-bottom:4px}
+#foil-thickness-toggle button{min-width:86px}
+.foil-actions{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.p-btn-small{font-size:11px;padding:4px 10px}
 
 /* Results */
 .results-section{margin-top:24px;display:flex;flex-direction:column;gap:16px}

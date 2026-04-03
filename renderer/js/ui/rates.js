@@ -25,6 +25,7 @@ function getRatesFromInputs() {
 export function renderRatesTable() {
   const rates = getRatesSync();
   const tbody = document.getElementById('rates-tbody');
+  const foilTbody = document.getElementById('foil-rates-tbody');
   if (!tbody) return;
 
   const rows = [
@@ -43,7 +44,24 @@ export function renderRatesTable() {
       <td class="gsm-cell">${row.gsm} gsm</td>
       <td><div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:13px;color:var(--color-text-tertiary)">₹</span>
-        <input class="rate-input" type="number" id="rate-${row.key}" value="${rates[row.key]}" min="0" step="0.01"/>
+        <input class="rate-input" type="number" id="rate-${row.key}" value="${rates[row.key] ?? DEFAULT_RATES[row.key]}" min="0" step="0.01"/>
+        <span style="font-size:12px;color:var(--color-text-tertiary)">per kg</span>
+      </div></td>
+    </tr>`).join('');
+
+  if (!foilTbody) return;
+  const foilRows = [
+    { key: 'foil_blister', label: 'Blister Foil' },
+    { key: 'foil_aluminium', label: 'Aluminium Foil' },
+    { key: 'foil_imported', label: 'Imported Foil' },
+  ];
+
+  foilTbody.innerHTML = foilRows.map(row => `
+    <tr>
+      <td>${row.label}</td>
+      <td><div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:13px;color:var(--color-text-tertiary)">₹</span>
+        <input class="rate-input" type="number" id="rate-${row.key}" value="${rates[row.key] ?? DEFAULT_RATES[row.key]}" min="0" step="0.01"/>
         <span style="font-size:12px;color:var(--color-text-tertiary)">per kg</span>
       </div></td>
     </tr>`).join('');
@@ -55,13 +73,13 @@ export function renderRatesTable() {
 
 async function handleSaveRates() {
   await dbSaveRates(getRatesFromInputs());
-  showToast('success', '✓ Paper rates saved successfully.');
+  showToast('success', '✓ Material rates saved successfully.');
 }
 
 async function handleResetRates() {
   await dbResetRates();
   renderRatesTable();
-  showToast('info', '↺ Paper rates reset to defaults.');
+  showToast('info', '↺ Material rates reset to defaults.');
 }
 
 

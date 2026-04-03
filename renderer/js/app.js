@@ -7,6 +7,7 @@
 import { initDb, getDbPath } from './db.js';
 import { initTabs, onTabActivate } from './ui/tabs.js';
 import { initPaperCalc } from './ui/paperCalc.js';
+import { initFoilCalc } from './ui/foilCalc.js';
 import { initRates, renderRatesTable } from './ui/rates.js';
 import { initHistory, renderHistory } from './ui/history.js';
 
@@ -20,6 +21,7 @@ async function boot() {
 
   // 3. Init each feature module (attaches event listeners)
   initPaperCalc();
+  initFoilCalc();
   initRates();
   initHistory();
 

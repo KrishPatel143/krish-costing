@@ -31,6 +31,9 @@ export const DEFAULT_RATES = {
   poster: 75,
   ink_half: 15000,
   ink_full: 15000,
+  foil_blister: 420,
+  foil_aluminium: 135,
+  foil_imported: 500,
 };
 
 /** @type {Record<string, { label: string, side1: string, side2: string }>} */
@@ -80,3 +83,38 @@ export const LAYER_NAMES = ['Outer', 'Middle', 'Inner'];
 
 /** Show breakdown tables by default in results */
 export const SHOW_BREAKDOWN = false;
+
+export const FOIL_GROUPS = {
+  PET: { label: 'PET', thicknesses: ['0.2', '0.25', 'Imported'] },
+  LDPE_PP: { label: 'LDPE / PP', thicknesses: ['0.3', '0.4'] },
+};
+
+export const FOIL_CLASSIFICATIONS = {
+  blister: { label: 'Blister Foil', rateKey: 'blister' },
+  aluminium: { label: 'Aluminium Foil', rateKey: 'aluminium' },
+  imported: { label: 'Imported Foil', rateKey: 'imported' },
+};
+
+export const FOIL_THICKNESS_TO_CLASS = {
+  '0.2': 'blister',
+  '0.25': 'blister',
+  '0.3': 'aluminium',
+  '0.4': 'aluminium',
+  Imported: 'imported',
+};
+
+export const FOIL_DEFAULT_GSM = {
+  '0.2': 59,
+  '0.25': 73,
+  '0.3': 118,
+  '0.4': 145,
+  Imported: 83,
+};
+
+export const FOIL_DEFAULT_RATES = {
+  blister: 420,
+  aluminium: 135,
+  imported: 500,
+};
+
+export const FOIL_PRINTING_GSM = 1.5;

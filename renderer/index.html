@@ -23,6 +23,7 @@
     <!-- Tab bar -->
     <div class="p-tab-bar" style="padding:0 8px">
       <button class="p-tab active" data-tab="calculator">Paper Pouch</button>
+      <button class="p-tab" data-tab="foil">Foil Costing</button>
       <button class="p-tab" data-tab="rates">Material Rates</button>
       <button class="p-tab" data-tab="history">History</button>
     </div>
@@ -121,6 +122,107 @@
 
 
 
+    <!-- ══ TAB: FOIL CALCULATOR ══ -->
+    <div id="tab-foil" class="tab-content" style="padding:22px">
+      <div class="calc-form">
+        <div class="field-group">
+          <div class="btn-group" id="foil-group-toggle">
+            <button type="button" class="active" data-group="PET">PET</button>
+            <button type="button" data-group="LDPE_PP">LDPE / PP</button>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="field-group">
+          <div class="btn-group" id="foil-thickness-toggle"></div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="field-group">
+          <div class="btn-group" id="foil-print-toggle">
+            <button type="button" class="active" data-print="plain">Plain</button>
+            <button type="button" data-print="printed">Printed</button>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div>
+          <div class="foil-grid">
+            <div class="field-group">
+              <label class="p-label" for="foil-size">Circle Size / Diameter (mm)</label>
+              <input class="p-input" type="number" id="foil-size" value="105" min="1" step="0.01"/>
+            </div>
+            <div class="field-group">
+              <label class="p-label" for="foil-quantity">Quantity</label>
+              <input class="p-input" type="number" id="foil-quantity" value="1000" min="1" step="1"/>
+            </div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div>
+          <div class="foil-grid">
+            <div class="field-group">
+              <label class="p-label" for="foil-wastage">Wastage (%)</label>
+              <input class="p-input" type="number" id="foil-wastage" value="4" min="0" step="0.01"/>
+            </div>
+            <div class="field-group">
+              <label class="p-label" for="foil-profit">Profit Margin (%)</label>
+              <input class="p-input" type="number" id="foil-profit" value="15" min="0" step="0.01"/>
+            </div>
+          </div>
+        </div>
+
+        <div id="foil-gsm-section" style="display:none">
+          <div class="divider"></div>
+          <div class="foil-grid">
+            <div class="field-group">
+              <label class="p-label" for="foil-gsm-02">0.2</label>
+              <input class="p-input" type="number" id="foil-gsm-02" min="0" step="0.01"/>
+            </div>
+            <div class="field-group">
+              <label class="p-label" for="foil-gsm-025">0.25</label>
+              <input class="p-input" type="number" id="foil-gsm-025" min="0" step="0.01"/>
+            </div>
+            <div class="field-group">
+              <label class="p-label" for="foil-gsm-imported">Imported</label>
+              <input class="p-input" type="number" id="foil-gsm-imported" min="0" step="0.01"/>
+            </div>
+            <div class="field-group">
+              <label class="p-label" for="foil-gsm-03">0.3</label>
+              <input class="p-input" type="number" id="foil-gsm-03" min="0" step="0.01"/>
+            </div>
+            <div class="field-group">
+              <label class="p-label" for="foil-gsm-04">0.4</label>
+              <input class="p-input" type="number" id="foil-gsm-04" min="0" step="0.01"/>
+            </div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="foil-actions">
+          <button class="p-btn p-btn-ghost p-btn-small" id="btn-foil-advice" type="button">Advance</button>
+          <div style="display:flex;gap:10px;align-items:center">
+            <button class="p-btn p-btn-primary" id="btn-foil-calculate">Calculate Foil Cost</button>
+            <button class="p-btn" id="btn-foil-clear">Clear</button>
+          </div>
+        </div>
+
+        <div id="foil-calc-error" style="display:none">
+          <div class="p-alert warn">
+            <span>⚠</span><span id="foil-calc-error-msg">Please fill all fields.</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="foil-results-section" class="results-section" style="display:none"></div>
+    </div>
+
     <!-- ══ TAB: MATERIAL RATES ══ -->
     <div id="tab-rates" class="tab-content" style="padding:22px">
       <div class="rates-section-head">
@@ -130,13 +232,26 @@
         </div>
         <div style="display:flex;gap:8px">
           <button class="p-btn p-btn-danger" id="btn-reset-rates">Reset Defaults</button>
-          <button class="p-btn p-btn-primary" id="btn-save-rates">Save Paper Rates</button>
+          <button class="p-btn p-btn-primary" id="btn-save-rates">Save Rates</button>
         </div>
       </div>
       <div class="rates-table-wrap">
         <table class="rates-table">
           <thead><tr><th>Material</th><th>GSM</th><th>Rate (₹ / kg)</th></tr></thead>
           <tbody id="rates-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="rates-section-head">
+        <div>
+          <div class="rates-section-title">Foil Material Rates</div>
+          <div class="rates-section-sub">Ink rate comes from Paper Ink Full. Only foil material rates are editable here.</div>
+        </div>
+      </div>
+      <div class="rates-table-wrap">
+        <table class="rates-table">
+          <thead><tr><th>Material</th><th>Rate (₹ / kg)</th></tr></thead>
+          <tbody id="foil-rates-tbody"></tbody>
         </table>
       </div>
 
