@@ -13,6 +13,7 @@ import { SHOW_BREAKDOWN } from '../data/materials.js';
  * @returns {string}
  */
 export function buildResultsHTML(o) {
+  const profitPct = o.profitPercent ?? 30;
   const thHTML   = o.tableHeaders.map(h => `<th>${h}</th>`).join('');
   const kgBanner = o.kgInfoLine
     ? `<div class="p-alert info" style="font-size:12px;margin-bottom:4px"><span>ℹ</span><span>${o.kgInfoLine}</span></div>`
@@ -26,7 +27,7 @@ export function buildResultsHTML(o) {
       <div class="result-big">
         <div class="rb-label">Final Cost per Pouch</div>
         <div class="rb-value">${fmt(o.finalPerPouch, 2)}</div>
-        <div class="rb-sub">Material + 30% profit + labour</div>
+        <div class="rb-sub">Material + ${profitPct}% profit + labour</div>
       </div>
       <div class="result-big-secondary">
         <div class="rb-label">Total Cost for ${o.qtyLabel}</div>
@@ -86,7 +87,7 @@ export function buildResultsHTML(o) {
           </div>
         </div>
         <div class="summary-row">
-          <span class="sr-label">Profit (30% of material cost)</span>
+          <span class="sr-label">Profit (${profitPct}% of material cost)</span>
           <div class="sr-values">
             <span>${fmt(o.profitPerPouch, 4)}</span>
             <span>${fmt(o.qtyProfit, 2)}</span>

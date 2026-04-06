@@ -92,6 +92,7 @@ function renderResults(d) {
     tableHeaders: ['Material','GSM','Rate/kg','Base (kg/pouch)','+3% Wastage','Total (kg×qty)','Cost/pouch','Cost×qty'],
     tableColspan: 6, matRowsHTML,
     totalMatCostPerPouch: d.totalMatCostPerPouch, qtyMatCost:   d.qtyTotals.matCost,
+    profitPercent:        d.profitPercent,
     profitPerPouch:       d.profitPerPouch,        qtyProfit:    d.qtyTotals.profit,
     labourPerPouch:       d.labourPerPouch,        qtyLabour:    d.qtyTotals.labour,
     labourBadgeText: d.labourExtra > 0 ? `+₹0.05 (${d.labourReason})` : 'Standard',

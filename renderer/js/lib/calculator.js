@@ -135,7 +135,8 @@ export function labourForFlex(height) {
 
 /**
  * Full paper pouch cost calculation.
- * @param {{ pouchTypeKey, height, width, inkCoverage, quantity, rates }} p
+ * Profit on material cost: 25% for plain (no print), 30% for one-side / two-side.
+ * @param {{ pouchTypeKey, height, width, inkCoverage, printType?, quantity, rates }} p
  */
 export function calcPaperPouch({ pouchTypeKey, height, width, inkCoverage, printType = 'one_side', quantity, rates }) {
   const pouchType = POUCH_TYPES[pouchTypeKey];
@@ -150,7 +151,8 @@ export function calcPaperPouch({ pouchTypeKey, height, width, inkCoverage, print
   const ink = calcMaterial(areaSqM, inkGsm, rates[inkKey]);
 
   const totalMatCostPerPouch = s1.costPerPouch + s2.costPerPouch + ink.costPerPouch;
-  const profitPerPouch = totalMatCostPerPouch * 0.30;
+  const profitPercent = printType === 'plain' ? 25 : 30;
+  const profitPerPouch = totalMatCostPerPouch * (profitPercent / 100);
   const { labourPerPouch, labourExtra, labourReason } = labourForPaper(pouchTypeKey, height);
   const finalPerPouch = totalMatCostPerPouch + profitPerPouch + labourPerPouch;
   const finalTotal = finalPerPouch * quantity;
@@ -168,6 +170,7 @@ export function calcPaperPouch({ pouchTypeKey, height, width, inkCoverage, print
     pouchType, s1Key, s2Key, inkKey, inkCoverage, printType,
     height, width, quantity, areaSqM,
     s1, s2, ink, rates,
+    profitPercent,
     totalMatCostPerPouch, profitPerPouch,
     labourPerPouch, labourExtra, labourReason,
     finalPerPouch, finalTotal, qtyTotals,
