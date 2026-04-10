@@ -89,6 +89,45 @@ export async function clearHistory() {
   if (hasIPC()) await window.krish.clearHistory();
 }
 
+// ─── Production orders ─────────────────────────────────────────────────────────
+
+/** @returns {Promise<object[]>} */
+export async function getProductionOrders() {
+  if (hasIPC()) return window.krish.getProductionOrders();
+  return [];
+}
+
+/** @returns {Promise<string>} */
+export async function getNextProductionOrderId() {
+  if (hasIPC()) return window.krish.getNextProductionOrderId();
+  const year = new Date().getFullYear();
+  return `ORD-${year}-0001`;
+}
+
+/** @param {object} entry */
+export async function addProductionOrder(entry) {
+  if (hasIPC()) return window.krish.addProductionOrder(entry);
+  return { ok: true, orderId: entry?.orderId ?? null };
+}
+
+/** @param {number|string} id @param {number} dispatchQuantity @param {string} dispatchDate */
+export async function updateProductionDispatch(id, dispatchQuantity, dispatchDate) {
+  if (hasIPC()) return window.krish.updateProductionDispatch(id, dispatchQuantity, dispatchDate);
+  return { ok: true };
+}
+
+/** @param {number|string} id @param {object} entry */
+export async function updateProductionOrder(id, entry) {
+  if (hasIPC()) return window.krish.updateProductionOrder(id, entry);
+  return { ok: true };
+}
+
+/** @param {number|string} id */
+export async function deleteProductionOrder(id) {
+  if (hasIPC()) return window.krish.deleteProductionOrder(id);
+  return { ok: true };
+}
+
 // ─── App meta ─────────────────────────────────────────────────────────────────
 
 export async function getDbPath() {

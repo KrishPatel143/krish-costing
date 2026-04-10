@@ -41,7 +41,7 @@ export const POUCH_TYPES = {
   med_ost: { label: 'Medical Paper + One Side Transparent', side1: 'med', side2: 'ost' },
   cromo_ost: { label: 'Cromo + One Side Transparent', side1: 'cromo', side2: 'ost' },
   cromo_cromo: { label: 'Cromo + Cromo', side1: 'cromo', side2: 'cromo' },
-  ply_ply: { label: '4 Ply + 4 Ply', side1: 'ply', side2: 'ply' },
+  ply_ply: { label: '`4 Ply` + 4 Ply', side1: 'ply', side2: 'ply' },
   poster_poster: { label: 'Poster + Poster', side1: 'poster', side2: 'poster' },
 };
 

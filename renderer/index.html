@@ -25,6 +25,7 @@
       <button class="p-tab active" data-tab="calculator">Paper Pouch</button>
       <button class="p-tab" data-tab="foil">Foil Costing</button>
       <button class="p-tab" data-tab="rates">Material Rates</button>
+      <button class="p-tab" data-tab="production">Production</button>
       <button class="p-tab" data-tab="history">History</button>
     </div>
 
@@ -261,6 +262,143 @@
         <div class="p-alert info" style="font-size:12px">
           <span>ℹ</span>
           <span>All rates are saved to your local database and persist across sessions.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ TAB: PRODUCTION ══ -->
+    <div id="tab-production" class="tab-content" style="padding:22px">
+      <div class="card" style="padding:16px;gap:16px">
+        <div class="btn-group" id="production-page-toggle">
+          <button type="button" data-page="new-order">New Order</button>
+          <button type="button" class="active" data-page="orders-table">Orders Table</button>
+        </div>
+
+        <div id="production-page-new-order" style="display:none">
+          <div class="form-row">
+            <div class="field-group">
+              <label class="p-label" for="prod-order-date">Order Date</label>
+              <input class="p-input" id="prod-order-date" type="date"/>
+            </div>
+            <div class="field-group">
+              <label class="p-label" for="prod-order-id">Order ID</label>
+              <input class="p-input" id="prod-order-id" type="text" readonly/>
+            </div>
+            <div class="field-group">
+              <label class="p-label" for="prod-po-number">PO Number (Optional)</label>
+              <input class="p-input" id="prod-po-number" type="text" placeholder="PO-001"/>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="form-row">
+            <div class="field-group">
+              <label class="p-label" for="prod-company-name">Company Name</label>
+              <input class="p-input" id="prod-company-name" type="text" list="prod-company-list" placeholder="Type company name"/>
+              <datalist id="prod-company-list"></datalist>
+            </div>
+            <div class="field-group">
+              <label class="p-label" for="prod-job-name">Job Name</label>
+              <input class="p-input" id="prod-job-name" type="text" list="prod-job-list" placeholder="Type product/job name"/>
+              <datalist id="prod-job-list"></datalist>
+            </div>
+            <div class="field-group">
+              <label class="p-label" for="prod-pouch-type">Pouch Type</label>
+              <select class="p-select" id="prod-pouch-type">
+                <option value="">Select type</option>
+                <option value="med_ost">Medical Paper + One Side Transparent</option>
+                <option value="cromo_ost">Cromo + One Side Transparent</option>
+                <option value="cromo_cromo">Cromo + Cromo</option>
+                <option value="ply_ply">4 Ply + 4 Ply</option>
+                <option value="poster_poster">Poster + Poster</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="form-row">
+            <div class="field-group">
+              <label class="p-label" for="prod-width-mm">Pouch Width (mm)</label>
+              <input class="p-input" id="prod-width-mm" type="number" min="1" step="0.01"/>
+            </div>
+            <div class="field-group">
+              <label class="p-label" for="prod-height-mm">Pouch Height (mm)</label>
+              <input class="p-input" id="prod-height-mm" type="number" min="1" step="0.01"/>
+            </div>
+            <div class="field-group">
+              <label class="p-label" for="prod-cylinder-up-mm">Cylinder Up (mm)</label>
+              <input class="p-input" id="prod-cylinder-up-mm" type="number" min="1" step="0.01"/>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="form-row">
+            <div class="field-group">
+              <label class="p-label" for="prod-print-type">Print Type</label>
+              <select class="p-select" id="prod-print-type">
+                <option value="">Select</option>
+                <option value="plain">Plain</option>
+                <option value="one_side" selected>Single Side</option>
+                <option value="two_side">Double Side</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="p-label" for="prod-rate">Rate</label>
+              <input class="p-input" id="prod-rate" type="number" min="0" step="0.01"/>
+            </div>
+            <div class="field-group">
+              <label class="p-label" for="prod-quantity">Quantity</label>
+              <input class="p-input" id="prod-quantity" type="number" min="0.001" step="0.001"/>
+            </div>
+            <div class="field-group">
+              <label class="p-label" for="prod-quantity-unit">Quantity Unit</label>
+              <select class="p-select" id="prod-quantity-unit">
+                <option value="nos">NOS</option>
+                <option value="kg">KG</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;align-items:center;margin-top:10px">
+            <button class="p-btn p-btn-primary" id="btn-prod-save-order" type="button">Save Order</button>
+            <button class="p-btn" id="btn-prod-clear-form" type="button">Clear</button>
+          </div>
+          <div id="prod-form-error" style="display:none;margin-top:12px">
+            <div class="p-alert warn">
+              <span>⚠</span><span id="prod-form-error-msg">Please fill required fields.</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="production-page-orders-table" style="display:none">
+          <div class="rates-table-wrap">
+            <table class="rates-table production-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Order ID</th>
+                  <th>Print Type</th>
+                  <th>Company</th>
+                  <th>Product/Job</th>
+                  <th>Pouch Type</th>
+                  <th>Pouch Size</th>
+                  <th>Quantity</th>
+                  <th>Rate</th>
+                  <th title="(width × cylinder up) / 1000 × print factor (2 if double-side)">Open size</th>
+                  <th>Total Meter</th>
+                  <th>Meter</th>
+                  <th>KG</th>
+                  <th>Dispatch Qty</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="prod-orders-tbody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

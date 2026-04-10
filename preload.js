@@ -16,6 +16,15 @@ contextBridge.exposeInMainWorld('krish', {
   getHistory:    ()      => ipcRenderer.invoke('db:getHistory'),
   clearHistory:  ()      => ipcRenderer.invoke('db:clearHistory'),
 
+  // Production orders
+  getProductionOrders:      ()            => ipcRenderer.invoke('db:getProductionOrders'),
+  getNextProductionOrderId: ()            => ipcRenderer.invoke('db:getNextProductionOrderId'),
+  addProductionOrder:       (entry)       => ipcRenderer.invoke('db:addProductionOrder', entry),
+  updateProductionDispatch: (id, dispatchQuantity, dispatchDate) =>
+    ipcRenderer.invoke('db:updateProductionDispatch', { id, dispatchQuantity, dispatchDate }),
+  updateProductionOrder:    (id, entry)   => ipcRenderer.invoke('db:updateProductionOrder', { id, entry }),
+  deleteProductionOrder:    (id)          => ipcRenderer.invoke('db:deleteProductionOrder', id),
+
   // App info
   getVersion:    ()      => ipcRenderer.invoke('app:getVersion'),
   getDbPath:     ()      => ipcRenderer.invoke('app:getDbPath'),

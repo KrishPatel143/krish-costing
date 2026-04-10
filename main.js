@@ -19,7 +19,8 @@ async function initDb() {
   db = new Low(adapter, {
     rates:     {},
     flexRates: {},
-    history:   []
+    history:   [],
+    productionOrders: []
   });
   await db.read();
 
@@ -27,6 +28,7 @@ async function initDb() {
   db.data.rates     = db.data.rates     || {};
   db.data.flexRates = db.data.flexRates || {};
   db.data.history   = db.data.history   || [];
+  db.data.productionOrders = db.data.productionOrders || [];
   await db.write();
 
   dbData = dbFile;
@@ -169,6 +171,99 @@ ipcMain.handle('db:clearHistory', async () => {
   db.data.history = [];
   await db.write();
   return true;
+});
+
+// Production orders
+function buildNextOrderId(orders) {
+  const nowYear = new Date().getFullYear();
+  const yearPrefix = `ORD-${nowYear}-`;
+  const yearOrders = orders.filter((o) => typeof o.orderId === 'string' && o.orderId.startsWith(yearPrefix));
+  const lastNum = yearOrders.reduce((max, order) => {
+    const num = parseInt(order.orderId.slice(yearPrefix.length), 10);
+    return Number.isFinite(num) ? Math.max(max, num) : max;
+  }, 0);
+  const nextNum = String(lastNum + 1).padStart(4, '0');
+  return `${yearPrefix}${nextNum}`;
+}
+
+ipcMain.handle('db:getProductionOrders', async () => {
+  await db.read();
+  return db.data.productionOrders;
+});
+
+ipcMain.handle('db:getNextProductionOrderId', async () => {
+  await db.read();
+  return buildNextOrderId(db.data.productionOrders || []);
+});
+
+ipcMain.handle('db:addProductionOrder', async (_, entry) => {
+  await db.read();
+  const now = new Date().toISOString();
+  const orders = db.data.productionOrders || [];
+  const orderId = entry.orderId || buildNextOrderId(orders);
+  orders.unshift({
+    ...entry,
+    dispatchEntries: Array.isArray(entry.dispatchEntries) ? entry.dispatchEntries : [],
+    dispatchQuantity: Number(entry.dispatchQuantity) || 0,
+    id: Date.now(),
+    orderId,
+    savedAt: now,
+  });
+  db.data.productionOrders = orders;
+  await db.write();
+  return { ok: true, orderId };
+});
+
+ipcMain.handle('db:updateProductionDispatch', async (_, payload) => {
+  await db.read();
+  const { id, dispatchQuantity, dispatchDate } = payload || {};
+  const orders = db.data.productionOrders || [];
+  const idx = orders.findIndex((o) => String(o.id) === String(id));
+  if (idx === -1) return { ok: false };
+  const qty = Number(dispatchQuantity);
+  if (!Number.isFinite(qty) || qty <= 0) return { ok: false };
+  const entry = {
+    date: dispatchDate || new Date().toISOString().slice(0, 10),
+    quantity: qty,
+    createdAt: new Date().toISOString(),
+  };
+  const prevEntries = Array.isArray(orders[idx].dispatchEntries) ? orders[idx].dispatchEntries : [];
+  const nextEntries = [...prevEntries, entry];
+  orders[idx].dispatchEntries = nextEntries;
+  orders[idx].dispatchQuantity = nextEntries.reduce((s, e) => s + (Number(e.quantity) || 0), 0);
+  await db.write();
+  return { ok: true, dispatchQuantity: orders[idx].dispatchQuantity, dispatchEntries: nextEntries };
+});
+
+ipcMain.handle('db:updateProductionOrder', async (_, payload) => {
+  await db.read();
+  const { id, entry } = payload || {};
+  const orders = db.data.productionOrders || [];
+  const idx = orders.findIndex((o) => String(o.id) === String(id));
+  if (idx === -1) return { ok: false };
+  const prev = orders[idx];
+  orders[idx] = {
+    ...prev,
+    ...entry,
+    dispatchEntries: Array.isArray(entry?.dispatchEntries) ? entry.dispatchEntries : (Array.isArray(prev.dispatchEntries) ? prev.dispatchEntries : []),
+    dispatchQuantity: Number(entry?.dispatchQuantity ?? prev.dispatchQuantity ?? 0) || 0,
+    id: prev.id,
+    orderId: prev.orderId,
+    savedAt: prev.savedAt,
+  };
+  await db.write();
+  return { ok: true };
+});
+
+ipcMain.handle('db:deleteProductionOrder', async (_, id) => {
+  await db.read();
+  const orders = db.data.productionOrders || [];
+  const idx = orders.findIndex((o) => String(o.id) === String(id));
+  if (idx === -1) return { ok: false };
+  orders.splice(idx, 1);
+  db.data.productionOrders = orders;
+  await db.write();
+  return { ok: true };
 });
 
 // App info

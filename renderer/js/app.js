@@ -10,6 +10,7 @@ import { initPaperCalc } from './ui/paperCalc.js';
 import { initFoilCalc } from './ui/foilCalc.js';
 import { initRates, renderRatesTable } from './ui/rates.js';
 import { initHistory, renderHistory } from './ui/history.js';
+import { initProduction, renderProductionOrders } from './ui/production.js';
 
 async function boot() {
   // 1. Pre-warm DB caches (fetches rates from LowDB via IPC)
@@ -18,12 +19,14 @@ async function boot() {
   // 2. Wire up tab switching with activation hooks
   initTabs();
   onTabActivate('history', renderHistory);
+  onTabActivate('production', renderProductionOrders);
 
   // 3. Init each feature module (attaches event listeners)
   initPaperCalc();
   initFoilCalc();
   initRates();
   initHistory();
+  await initProduction();
 
   // 4. Render static tables that need data at startup
   renderRatesTable();
