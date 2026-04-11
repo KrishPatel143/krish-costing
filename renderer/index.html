@@ -307,11 +307,19 @@
               <label class="p-label" for="prod-pouch-type">Pouch Type</label>
               <select class="p-select" id="prod-pouch-type">
                 <option value="">Select type</option>
-                <option value="med_ost">Medical Paper + One Side Transparent</option>
-                <option value="cromo_ost">Cromo + One Side Transparent</option>
-                <option value="cromo_cromo">Cromo + Cromo</option>
-                <option value="ply_ply">4 Ply + 4 Ply</option>
-                <option value="poster_poster">Poster + Poster</option>
+                <optgroup label="Single web (kg only)">
+                  <option value="prod_medical_paper">Medical Paper</option>
+                  <option value="prod_cromo">Cromo</option>
+                  <option value="prod_4ply">4 Ply</option>
+                  <option value="prod_poster">Poster</option>
+                </optgroup>
+                <optgroup label="Laminate pouch (width × height)">
+                  <option value="med_ost">Medical Paper + One Side Transparent</option>
+                  <option value="cromo_ost">Cromo + One Side Transparent</option>
+                  <option value="cromo_cromo">Cromo + Cromo</option>
+                  <option value="ply_ply">4 Ply + 4 Ply</option>
+                  <option value="poster_poster">Poster + Poster</option>
+                </optgroup>
               </select>
             </div>
           </div>
@@ -323,9 +331,9 @@
               <label class="p-label" for="prod-width-mm">Pouch Width (mm)</label>
               <input class="p-input" id="prod-width-mm" type="number" min="1" step="0.01"/>
             </div>
-            <div class="field-group">
+            <div class="field-group" id="prod-height-field-group">
               <label class="p-label" for="prod-height-mm">Pouch Height (mm)</label>
-              <input class="p-input" id="prod-height-mm" type="number" min="1" step="0.01"/>
+              <input class="p-input" id="prod-height-mm" type="number" min="0" step="0.01" value=""/>
             </div>
             <div class="field-group">
               <label class="p-label" for="prod-cylinder-up-mm">Cylinder Up (mm)</label>
@@ -353,12 +361,16 @@
               <label class="p-label" for="prod-quantity">Quantity</label>
               <input class="p-input" id="prod-quantity" type="number" min="0.001" step="0.001"/>
             </div>
-            <div class="field-group">
+            <div class="field-group" id="prod-quantity-unit-wrap">
               <label class="p-label" for="prod-quantity-unit">Quantity Unit</label>
               <select class="p-select" id="prod-quantity-unit">
                 <option value="nos">NOS</option>
                 <option value="kg">KG</option>
               </select>
+            </div>
+            <div class="field-group" id="prod-quantity-kg-only-wrap" style="display:none">
+              <label class="p-label">Quantity Unit</label>
+              <div class="p-input" style="display:flex;align-items:center;background:var(--color-bg-secondary);color:var(--color-text-secondary)">KG only</div>
             </div>
           </div>
 
@@ -374,12 +386,55 @@
         </div>
 
         <div id="production-page-orders-table" style="display:none">
+          <div class="form-row" style="flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;gap:12px">
+            <div class="field-group" style="min-width:200px;flex:1;max-width:320px">
+              <label class="p-label" for="prod-table-search">Search</label>
+              <input class="p-input" id="prod-table-search" type="search" placeholder="Order ID, PO, company, job…" style="width:100%"/>
+            </div>
+            <div class="field-group" style="min-width:140px">
+              <label class="p-label" for="prod-table-status">Status</label>
+              <select class="p-select" id="prod-table-status" style="width:100%">
+                <option value="all" selected>All</option>
+                <option value="pending">Pending</option>
+                <option value="completed">Completed</option>
+              </select>
+            </div>
+            <div class="field-group" style="min-width:180px;flex:1;max-width:260px">
+              <label class="p-label" for="prod-table-company">Company</label>
+              <select class="p-select" id="prod-table-company" style="width:100%">
+                <option value="">All companies</option>
+              </select>
+            </div>
+            <div class="field-group" style="min-width:200px;flex:1;max-width:280px">
+              <label class="p-label" for="prod-table-pouch-type">Pouch Type</label>
+              <select class="p-select" id="prod-table-pouch-type" style="width:100%">
+                <option value="">All pouch types</option>
+                <optgroup label="Single web (kg only)">
+                  <option value="prod_medical_paper">Medical Paper</option>
+                  <option value="prod_cromo">Cromo</option>
+                  <option value="prod_4ply">4 Ply</option>
+                  <option value="prod_poster">Poster</option>
+                </optgroup>
+                <optgroup label="Laminate pouch">
+                  <option value="med_ost">Medical Paper + One Side Transparent</option>
+                  <option value="cromo_ost">Cromo + One Side Transparent</option>
+                  <option value="cromo_cromo">Cromo + Cromo</option>
+                  <option value="ply_ply">4 Ply + 4 Ply</option>
+                  <option value="poster_poster">Poster + Poster</option>
+                </optgroup>
+              </select>
+            </div>
+            <div class="field-group" style="padding-bottom:2px">
+              <button type="button" class="p-btn p-btn-ghost" id="btn-prod-table-clear-filters">Clear filters</button>
+            </div>
+          </div>
           <div class="rates-table-wrap">
             <table class="rates-table production-table">
               <thead>
                 <tr>
                   <th>Date</th>
                   <th>Order ID</th>
+                  <th>PO Number</th>
                   <th>Print Type</th>
                   <th>Company</th>
                   <th>Product/Job</th>
@@ -388,7 +443,6 @@
                   <th>Quantity</th>
                   <th>Rate</th>
                   <th title="(width × cylinder up) / 1000 × print factor (2 if double-side)">Open size</th>
-                  <th>Total Meter</th>
                   <th>Meter</th>
                   <th>KG</th>
                   <th>Dispatch Qty</th>

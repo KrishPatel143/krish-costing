@@ -41,8 +41,20 @@ export const POUCH_TYPES = {
   med_ost: { label: 'Medical Paper + One Side Transparent', side1: 'med', side2: 'ost' },
   cromo_ost: { label: 'Cromo + One Side Transparent', side1: 'cromo', side2: 'ost' },
   cromo_cromo: { label: 'Cromo + Cromo', side1: 'cromo', side2: 'cromo' },
-  ply_ply: { label: '`4 Ply` + 4 Ply', side1: 'ply', side2: 'ply' },
+  ply_ply: { label: '4 Ply + 4 Ply', side1: 'ply', side2: 'ply' },
   poster_poster: { label: 'Poster + Poster', side1: 'poster', side2: 'poster' },
+};
+
+/**
+ * Production only — single web (one material). Quantity is kg only.
+ * Area (m²) = (kg × 1000) g ÷ GSM. Not used by the paper pouch calculator tab.
+ * @type {Record<string, { label: string, gsmKey: keyof typeof MATERIALS }>}
+ */
+export const PRODUCTION_SINGLE_SIDE_POUCH_TYPES = {
+  prod_medical_paper: { label: 'Medical Paper', gsmKey: 'med' },
+  prod_cromo: { label: 'Cromo', gsmKey: 'cromo' },
+  prod_4ply: { label: '4 Ply', gsmKey: 'ply' },
+  prod_poster: { label: 'Poster', gsmKey: 'poster' },
 };
 
 /** @type {Record<string, { label: string, density: number, defaultRate: number }>} */

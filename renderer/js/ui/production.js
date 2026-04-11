@@ -11,7 +11,7 @@ import {
   updateProductionOrder,
   deleteProductionOrder,
 } from '../db.js';
-import { MATERIALS, POUCH_TYPES } from '../data/materials.js';
+import { MATERIALS, POUCH_TYPES, PRODUCTION_SINGLE_SIDE_POUCH_TYPES } from '../data/materials.js';
 import { fmt, fmtDate } from '../lib/formatter.js';
 import { showToast } from './toast.js';
 
@@ -30,6 +30,20 @@ function todayIsoDate() {
 function numberOrNull(v) {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
+}
+
+function htmlAttr(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;');
+}
+
+function escapeHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 function showFormError(msg) {
@@ -63,6 +77,69 @@ function renderCompanySuggestions() {
   els.companyList.innerHTML = companies.map((name) => `<option value="${name}"></option>`).join('');
 }
 
+function renderOrderTableCompanyFilter() {
+  if (!els.prodTableCompany) return;
+  const prev = els.prodTableCompany.value;
+  const companies = buildUniqueCompanyList(ordersCache).sort((a, b) => a.localeCompare(b));
+  const sel = els.prodTableCompany;
+  sel.textContent = '';
+  const allOpt = document.createElement('option');
+  allOpt.value = '';
+  allOpt.textContent = 'All companies';
+  sel.appendChild(allOpt);
+  for (const name of companies) {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    sel.appendChild(opt);
+  }
+  if (prev && companies.includes(prev)) sel.value = prev;
+}
+
+/** Orders visible in the table after search / status / company / pouch type filters. */
+function getFilteredProductionOrders() {
+  let list = ordersCache.slice();
+  const search = (els.prodTableSearch?.value || '').trim().toLowerCase();
+  const status = els.prodTableStatus?.value || 'all';
+  const companyNeedle = (els.prodTableCompany?.value || '').trim().toLowerCase();
+  const pouchKey = (els.prodTablePouchType?.value || '').trim();
+
+  if (search) {
+    list = list.filter((o) => {
+      const parts = [
+        o.orderId,
+        o.poNumber,
+        o.companyName,
+        o.jobName,
+        o.orderDate,
+        pouchTypeLabel(o.pouchType),
+        printTypeLabel(o.printType),
+      ];
+      const hay = parts.filter(Boolean).join(' ').toLowerCase();
+      return hay.includes(search);
+    });
+  }
+  if (status === 'pending') {
+    list = list.filter((o) => normalizeOrderStatus(o) === 'pending');
+  } else if (status === 'completed') {
+    list = list.filter((o) => normalizeOrderStatus(o) === 'completed');
+  }
+  if (companyNeedle) {
+    list = list.filter((o) => (o.companyName || '').trim().toLowerCase() === companyNeedle);
+  }
+  if (pouchKey) {
+    list = list.filter((o) => String(o.pouchType || '') === pouchKey);
+  }
+
+  if (editingRowId != null) {
+    const ed = ordersCache.find((o) => Number(o.id) === Number(editingRowId));
+    if (ed && !list.some((o) => Number(o.id) === Number(editingRowId))) {
+      list = [ed, ...list];
+    }
+  }
+  return list;
+}
+
 function renderJobSuggestions(companyName) {
   if (!els.jobList) return;
   const jobs = buildUniqueJobsForCompany(companyName, ordersCache);
@@ -89,16 +166,29 @@ function autofillFromLastOrder() {
   if (els.printType) els.printType.value = normalizeProductionPrintType(last.printType) || 'one_side';
   if (els.rate) els.rate.value = last.rate ?? '';
   if (els.quantityUnit) els.quantityUnit.value = last.quantityUnit || 'nos';
+  syncProductionPouchFormUI();
+}
+
+function isProductionSingleSidePouch(pouchType) {
+  return Boolean(PRODUCTION_SINGLE_SIDE_POUCH_TYPES[pouchType]);
+}
+
+function productionSingleSideGsm(pouchType) {
+  const cfg = PRODUCTION_SINGLE_SIDE_POUCH_TYPES[pouchType];
+  if (!cfg) return 0;
+  return MATERIALS[cfg.gsmKey]?.gsm ?? 0;
 }
 
 function pouchSingleSideGsm(pouchType) {
+  if (isProductionSingleSidePouch(pouchType)) return productionSingleSideGsm(pouchType);
   const pt = POUCH_TYPES[pouchType];
   if (!pt) return 0;
   return MATERIALS[pt.side1]?.gsm ?? 0;
 }
 
-/** Total pouch GSM (side 1 + side 2) — used when quantity is in KG. */
+/** Total pouch GSM (side 1 + side 2) — laminate kg path; single-web uses one gsm only. */
 function pouchTotalGsm(pouchType) {
+  if (isProductionSingleSidePouch(pouchType)) return productionSingleSideGsm(pouchType);
   const pt = POUCH_TYPES[pouchType];
   if (!pt) return 0;
   const s1 = MATERIALS[pt.side1]?.gsm ?? 0;
@@ -124,28 +214,70 @@ function computeOpenSizeM2(order) {
   const widthMm = numberOrNull(order?.widthMm) ?? 0;
   const cylinderUpMm = numberOrNull(order?.cylinderUpMm) ?? 0;
   const pf = productionPrintFactor(order?.printType);
-  return ((widthMm * cylinderUpMm) / 1000) * pf;
+  return (widthMm * cylinderUpMm)  * pf;
 }
 
 function pouchTypeLabel(pouchTypeKey) {
+  if (PRODUCTION_SINGLE_SIDE_POUCH_TYPES[pouchTypeKey]) {
+    return PRODUCTION_SINGLE_SIDE_POUCH_TYPES[pouchTypeKey].label;
+  }
   return POUCH_TYPES[pouchTypeKey]?.label ?? (pouchTypeKey || '—');
 }
 
+/**
+ * Laminate labels "A + B" → line break after + ; second line slightly indented.
+ * Single-web labels stay one line.
+ */
+function pouchTypeDisplayHtml(pouchTypeKey) {
+  const label = pouchTypeLabel(pouchTypeKey);
+  if (!label || label === '—') return label;
+  const sep = ' + ';
+  const i = label.indexOf(sep);
+  if (i === -1) return escapeHtml(label);
+  const first = label.slice(0, i).trimEnd();
+  const second = label.slice(i + sep.length).trim();
+  return `${escapeHtml(first)} +<br/><span style="display:block;padding-left:6px;margin-top:2px;line-height:1.35;color:var(--color-text-secondary)">${escapeHtml(second)}</span>`;
+}
+
 function pouchTypeSelectHtml(selectedKey) {
-  const opts = Object.entries(POUCH_TYPES)
+  const singleOpts = Object.entries(PRODUCTION_SINGLE_SIDE_POUCH_TYPES)
     .map(([k, { label }]) => `<option value="${k}" ${k === selectedKey ? 'selected' : ''}>${label}</option>`)
     .join('');
-  return `<option value="">Select type</option>${opts}`;
+  const lamOpts = Object.entries(POUCH_TYPES)
+    .map(([k, { label }]) => `<option value="${k}" ${k === selectedKey ? 'selected' : ''}>${label}</option>`)
+    .join('');
+  return `<option value="">Select type</option><optgroup label="Single web (kg only)">${singleOpts}</optgroup><optgroup label="Laminate pouch">${lamOpts}</optgroup>`;
+}
+
+/** Single-web row: show width only (no height). */
+function pouchSizeCellDisplay(o) {
+  if (isProductionSingleSidePouch(o.pouchType)) {
+    return `${fmtWhole(o.widthMm)} mm`;
+  }
+  return `${fmtWhole(o.widthMm)}*${fmtWhole(o.heightMm)}`;
 }
 
 function calculateProduction(entry) {
   const widthMm = numberOrNull(entry.widthMm) ?? 0;
-  const heightMm = numberOrNull(entry.heightMm) ?? 0;
   const cylinderUpMm = numberOrNull(entry.cylinderUpMm) ?? 0;
   const qty = numberOrNull(entry.quantity) ?? 0;
   const unit = entry.quantityUnit;
   const printFactor = productionPrintFactor(entry.printType);
 
+  if (isProductionSingleSidePouch(entry.pouchType)) {
+    const gsm = productionSingleSideGsm(entry.pouchType);
+    const totalGrams = qty * 1000;
+    const heightMm = 0;
+    const pouchSizeM2 = 0;
+    const openSizeM2 = ((widthMm * cylinderUpMm) / 1000) * printFactor;
+    const totalMeter = gsm > 0 ? totalGrams / gsm : 0;
+    const meter = openSizeM2 > 0 ? totalMeter / openSizeM2 : 0;
+    const effectiveGsm = gsm;
+    const kg = gsm > 0 ? (totalMeter * gsm) / 1000 : 0;
+    return { pouchSizeM2, openSizeM2, totalMeter, meter, kg, effectiveGsm };
+  }
+
+  const heightMm = numberOrNull(entry.heightMm) ?? 0;
   const pouchSizeM2 = ((heightMm * widthMm) / 1_000_000) * printFactor;
   const openSizeM2 = ((widthMm * cylinderUpMm) / 1000) * printFactor;
 
@@ -172,34 +304,57 @@ function calculateProduction(entry) {
 }
 
 function readForm() {
+  const pouchType = els.pouchType?.value || '';
+  const single = isProductionSingleSidePouch(pouchType);
   return {
     orderDate: els.orderDate?.value || todayIsoDate(),
     orderId: els.orderId?.value || '',
     poNumber: (els.poNumber?.value || '').trim(),
     companyName: (els.companyName?.value || '').trim(),
     jobName: (els.jobName?.value || '').trim(),
-    pouchType: els.pouchType?.value || '',
+    pouchType,
     widthMm: numberOrNull(els.widthMm?.value),
-    heightMm: numberOrNull(els.heightMm?.value),
+    heightMm: single ? 0 : numberOrNull(els.heightMm?.value),
     cylinderUpMm: numberOrNull(els.cylinderUpMm?.value),
     printType: els.printType?.value || '',
     rate: numberOrNull(els.rate?.value),
     quantity: numberOrNull(els.quantity?.value),
-    quantityUnit: els.quantityUnit?.value || 'nos',
+    quantityUnit: single ? 'kg' : (els.quantityUnit?.value || 'nos'),
     dispatchQuantity: null,
   };
 }
 
 function validateForm(data) {
-  const requiredText = ['companyName', 'jobName', 'pouchType', 'printType', 'quantityUnit'];
+  const requiredText = ['companyName', 'jobName', 'pouchType', 'printType'];
   for (const k of requiredText) {
     if (!data[k]) return `Please fill ${k}.`;
   }
-  const requiredNum = ['widthMm', 'heightMm', 'cylinderUpMm', 'rate', 'quantity'];
+  const single = isProductionSingleSidePouch(data.pouchType);
+  if (!single && !data.quantityUnit) return 'Please select quantity unit.';
+  if (single && String(data.quantityUnit).toLowerCase() !== 'kg') return 'Single web pouch types must use KG quantity.';
+  const requiredNum = ['widthMm', 'cylinderUpMm', 'rate', 'quantity'];
   for (const k of requiredNum) {
     if (!Number.isFinite(data[k]) || data[k] <= 0) return `Please enter valid ${k}.`;
   }
+  if (!single) {
+    if (!Number.isFinite(data.heightMm) || data.heightMm <= 0) return 'Please enter valid heightMm.';
+  }
   return null;
+}
+
+function syncProductionPouchFormUI() {
+  const pouchType = els.pouchType?.value || '';
+  const single = isProductionSingleSidePouch(pouchType);
+  if (els.heightFieldGroup) els.heightFieldGroup.style.display = single ? 'none' : '';
+  if (els.heightMm && single) {
+    els.heightMm.value = '';
+    els.heightMm.required = false;
+  } else if (els.heightMm) {
+    els.heightMm.required = true;
+  }
+  if (els.quantityUnitWrap) els.quantityUnitWrap.style.display = single ? 'none' : '';
+  if (els.quantityKgOnlyWrap) els.quantityKgOnlyWrap.style.display = single ? '' : 'none';
+  if (els.quantityUnit && single) els.quantityUnit.value = 'kg';
 }
 
 function fmtUnitQty(qty, unit) {
@@ -257,7 +412,7 @@ function dispatchTooltip(row) {
 
 function openSizeDisplay(order) {
   const v = computeOpenSizeM2(order);
-  return fmt(v, 4);
+  return fmtWhole(v);
 }
 
 function renderOrdersTable() {
@@ -267,7 +422,13 @@ function renderOrdersTable() {
     return;
   }
 
-  els.ordersTbody.innerHTML = ordersCache.map((o) => `
+  const visible = getFilteredProductionOrders();
+  if (!visible.length) {
+    els.ordersTbody.innerHTML = '<tr><td colspan="16" style="text-align:center;color:var(--color-text-tertiary)">No orders match your filters.</td></tr>';
+    return;
+  }
+
+  els.ordersTbody.innerHTML = visible.map((o) => `
     <tr>
       <td title="${o.savedAt ? fmtDate(o.savedAt) : ''}">
         ${editingRowId === o.id ? `
@@ -275,6 +436,11 @@ function renderOrdersTable() {
         ` : (o.orderDate || '-')}
       </td>
       <td style="font-family:var(--mono)">${o.orderId || '-'}</td>
+      <td style="font-family:var(--mono)">
+        ${editingRowId === o.id
+          ? `<input class="p-input prod-edit-po-number" data-prod-id="${o.id}" type="text" value="${htmlAttr(o.poNumber || '')}" placeholder="Optional" style="width:120px"/>`
+          : ((o.poNumber || '').trim() || '—')}
+      </td>
       <td>
         ${editingRowId === o.id ? `
         <select class="p-select prod-edit-print-type" data-prod-id="${o.id}" style="min-width:120px">
@@ -294,20 +460,21 @@ function renderOrdersTable() {
           ? `<input class="p-input prod-edit-job" data-prod-id="${o.id}" type="text" value="${o.jobName || ''}" style="width:180px"/>`
           : (o.jobName || '-')}
       </td>
-      <td style="font-size:12px;max-width:200px">
+      <td style="font-size:12px;max-width:220px;line-height:1.35">
         ${editingRowId === o.id
           ? `<select class="p-select prod-edit-pouch-type" data-prod-id="${o.id}" style="min-width:160px;max-width:220px">${pouchTypeSelectHtml(o.pouchType || '')}</select>`
-          : pouchTypeLabel(o.pouchType)}
+          : pouchTypeDisplayHtml(o.pouchType)}
       </td>
-      <td style="font-family:var(--mono)">${fmtWhole(o.widthMm)}*${fmtWhole(o.heightMm)}</td>
+      <td style="font-family:var(--mono)">${pouchSizeCellDisplay(o)}</td>
       <td style="font-family:var(--mono)">
         ${editingRowId === o.id ? `
-        <div style="display:flex;gap:6px;align-items:center">
+        <div class="prod-edit-qty-cell" data-prod-id="${o.id}" style="display:flex;gap:6px;align-items:center">
           <input class="p-input prod-edit-quantity" data-prod-id="${o.id}" type="number" min="0.001" step="0.001" value="${o.quantity ?? 0}" style="width:100px"/>
-          <select class="p-select prod-edit-unit" data-prod-id="${o.id}" style="min-width:84px">
+          <select class="p-select prod-edit-unit-lam" data-prod-id="${o.id}" style="min-width:84px;display:${isProductionSingleSidePouch(o.pouchType) ? 'none' : ''}">
             <option value="nos" ${String(o.quantityUnit).toLowerCase() === 'nos' ? 'selected' : ''}>NOS</option>
             <option value="kg" ${String(o.quantityUnit).toLowerCase() === 'kg' ? 'selected' : ''}>KG</option>
           </select>
+          <span class="prod-edit-unit-kg-label" style="font-size:12px;color:var(--color-text-tertiary);white-space:nowrap;display:${isProductionSingleSidePouch(o.pouchType) ? 'inline' : 'none'}">KG</span>
         </div>
         ` : fmtUnitQty(o.quantity, o.quantityUnit)}
       </td>
@@ -320,11 +487,6 @@ function renderOrdersTable() {
         ${editingRowId === o.id
           ? `<span class="prod-open-size-preview" data-prod-id="${o.id}">${openSizeDisplay(o)}</span>`
           : openSizeDisplay(o)}
-      </td>
-      <td style="font-family:var(--mono)">
-        ${editingRowId === o.id
-          ? `<input class="p-input prod-edit-total-meter" data-prod-id="${o.id}" type="number" min="0" step="1" value="${fmtWhole(o.totalMeter).replace(/,/g,'')}" style="width:110px"/>`
-          : fmtWhole(o.totalMeter)}
       </td>
       <td style="font-family:var(--mono)">
         ${editingRowId === o.id
@@ -373,6 +535,21 @@ function renderOrdersTable() {
     </tr>
   `).join('');
 
+  els.ordersTbody.querySelectorAll('.prod-edit-pouch-type').forEach((sel) => {
+    const id = sel.getAttribute('data-prod-id');
+    const tr = sel.closest('tr');
+    if (!tr) return;
+    const lam = tr.querySelector(`.prod-edit-unit-lam[data-prod-id="${id}"]`);
+    const kgLbl = tr.querySelector(`.prod-edit-qty-cell[data-prod-id="${id}"] .prod-edit-unit-kg-label`);
+    const syncQtyUnit = () => {
+      const single = isProductionSingleSidePouch(sel.value);
+      if (lam) lam.style.display = single ? 'none' : '';
+      if (kgLbl) kgLbl.style.display = single ? 'inline' : 'none';
+    };
+    sel.addEventListener('change', syncQtyUnit);
+    syncQtyUnit();
+  });
+
   els.ordersTbody.querySelectorAll('.prod-edit-print-type').forEach((sel) => {
     const id = sel.getAttribute('data-prod-id');
     const row = ordersCache.find((it) => String(it.id) === String(id));
@@ -408,17 +585,31 @@ function renderOrdersTable() {
       const q = (selector) => els.ordersTbody.querySelector(`${selector}[data-prod-id="${id}"]`);
 
       const orderDate = q('.prod-edit-order-date')?.value || row.orderDate;
+      const poNumber = (q('.prod-edit-po-number')?.value || '').trim();
       const printType = normalizeProductionPrintType(q('.prod-edit-print-type')?.value || row.printType || 'one_side');
       const pouchType = q('.prod-edit-pouch-type')?.value || row.pouchType || '';
       const companyName = (q('.prod-edit-company')?.value || row.companyName || '').trim();
       const jobName = (q('.prod-edit-job')?.value || row.jobName || '').trim();
       const quantity = numberOrNull(q('.prod-edit-quantity')?.value);
-      const quantityUnit = q('.prod-edit-unit')?.value || row.quantityUnit || 'nos';
+      const quantityUnit = isProductionSingleSidePouch(pouchType)
+        ? 'kg'
+        : (q('.prod-edit-unit-lam')?.value || row.quantityUnit || 'nos');
       const rate = numberOrNull(q('.prod-edit-rate')?.value);
-      const totalMeter = numberOrNull(q('.prod-edit-total-meter')?.value);
       const meter = numberOrNull(q('.prod-edit-meter')?.value);
       const kg = numberOrNull(q('.prod-edit-kg')?.value);
       const dispatchQuantity = q('.prod-dispatch-input')?.value === '' ? null : numberOrNull(q('.prod-dispatch-input')?.value);
+
+      const calcIn = {
+        pouchType,
+        printType,
+        quantity,
+        quantityUnit,
+        widthMm: numberOrNull(row.widthMm),
+        heightMm: isProductionSingleSidePouch(pouchType) ? 0 : numberOrNull(row.heightMm),
+        cylinderUpMm: numberOrNull(row.cylinderUpMm),
+      };
+      const calcOut = calculateProduction(calcIn);
+      const totalMeter = calcOut.totalMeter;
 
       if (
         !companyName || !jobName || !pouchType ||
@@ -432,23 +623,34 @@ function renderOrdersTable() {
         return;
       }
 
+      if (!isProductionSingleSidePouch(pouchType) && POUCH_TYPES[pouchType]) {
+        const hm = numberOrNull(row.heightMm) ?? 0;
+        if (hm <= 0) {
+          showToast('warn', 'Laminate orders need height on file; re-create from New Order or fix data.');
+          return;
+        }
+      }
+
       const mergedDims = {
         ...row,
         pouchType,
         printType,
         widthMm: row.widthMm,
-        heightMm: row.heightMm,
+        heightMm: isProductionSingleSidePouch(pouchType) ? 0 : row.heightMm,
         cylinderUpMm: row.cylinderUpMm,
       };
       const openSizeM2 = computeOpenSizeM2(mergedDims);
       const printFactor = productionPrintFactor(printType);
       const widthMm = numberOrNull(row.widthMm) ?? 0;
-      const heightMm = numberOrNull(row.heightMm) ?? 0;
-      const pouchSizeM2 = ((heightMm * widthMm) / 1_000_000) * printFactor;
+      const heightMm = isProductionSingleSidePouch(pouchType) ? 0 : (numberOrNull(row.heightMm) ?? 0);
+      const pouchSizeM2 = isProductionSingleSidePouch(pouchType)
+        ? 0
+        : ((heightMm * widthMm) / 1_000_000) * printFactor;
 
       const editable = {
         ...row,
         orderDate,
+        poNumber,
         printType,
         pouchType,
         companyName,
@@ -458,6 +660,7 @@ function renderOrdersTable() {
         rate,
         openSizeM2,
         pouchSizeM2,
+        heightMm,
         totalMeter,
         meter,
         kg,
@@ -560,6 +763,7 @@ async function refreshOrders() {
     }
   }
   renderCompanySuggestions();
+  renderOrderTableCompanyFilter();
   renderJobSuggestions(els.companyName?.value || '');
   renderOrdersTable();
 }
@@ -578,6 +782,7 @@ async function resetFormKeepContext() {
   if (els.rate) els.rate.value = '';
   if (els.quantity) els.quantity.value = '';
   if (els.quantityUnit) els.quantityUnit.value = 'nos';
+  syncProductionPouchFormUI();
   hideFormError();
 }
 
@@ -635,9 +840,22 @@ function bindEvents() {
     autofillFromLastOrder();
   });
   els.jobName?.addEventListener('change', autofillFromLastOrder);
+  els.pouchType?.addEventListener('change', syncProductionPouchFormUI);
   byId('btn-prod-save-order')?.addEventListener('click', saveOrder);
   byId('btn-prod-clear-form')?.addEventListener('click', () => {
     resetFormKeepContext();
+  });
+
+  els.prodTableSearch?.addEventListener('input', () => renderOrdersTable());
+  els.prodTableStatus?.addEventListener('change', () => renderOrdersTable());
+  els.prodTableCompany?.addEventListener('change', () => renderOrdersTable());
+  els.prodTablePouchType?.addEventListener('change', () => renderOrdersTable());
+  byId('btn-prod-table-clear-filters')?.addEventListener('click', () => {
+    if (els.prodTableSearch) els.prodTableSearch.value = '';
+    if (els.prodTableStatus) els.prodTableStatus.value = 'all';
+    if (els.prodTableCompany) els.prodTableCompany.value = '';
+    if (els.prodTablePouchType) els.prodTablePouchType.value = '';
+    renderOrdersTable();
   });
 }
 
@@ -655,11 +873,18 @@ function cacheElements() {
   els.rate = byId('prod-rate');
   els.quantity = byId('prod-quantity');
   els.quantityUnit = byId('prod-quantity-unit');
+  els.heightFieldGroup = byId('prod-height-field-group');
+  els.quantityUnitWrap = byId('prod-quantity-unit-wrap');
+  els.quantityKgOnlyWrap = byId('prod-quantity-kg-only-wrap');
   els.companyList = byId('prod-company-list');
   els.jobList = byId('prod-job-list');
   els.formError = byId('prod-form-error');
   els.formErrorMsg = byId('prod-form-error-msg');
   els.ordersTbody = byId('prod-orders-tbody');
+  els.prodTableSearch = byId('prod-table-search');
+  els.prodTableStatus = byId('prod-table-status');
+  els.prodTableCompany = byId('prod-table-company');
+  els.prodTablePouchType = byId('prod-table-pouch-type');
 }
 
 export async function renderProductionOrders() {
@@ -670,6 +895,7 @@ export async function initProduction() {
   cacheElements();
   setupPageToggle();
   bindEvents();
+  syncProductionPouchFormUI();
   if (els.orderDate && !els.orderDate.value) els.orderDate.value = todayIsoDate();
   if (els.orderId && !els.orderId.value) els.orderId.value = await getNextProductionOrderId();
   await refreshOrders();
