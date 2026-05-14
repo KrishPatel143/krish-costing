@@ -271,7 +271,8 @@
       <div class="card" style="padding:16px;gap:16px">
         <div class="btn-group" id="production-page-toggle">
           <button type="button" data-page="new-order">New Order</button>
-          <button type="button" class="active" data-page="orders-table">Orders Table</button>
+          <button type="button" class="active" data-page="orders-table">Detail View</button>
+          <button type="button" data-page="detail-view">Orders Table</button>
         </div>
 
         <div id="production-page-new-order" style="display:none">
@@ -295,12 +296,12 @@
           <div class="form-row">
             <div class="field-group">
               <label class="p-label" for="prod-company-name">Company Name</label>
-              <input class="p-input" id="prod-company-name" type="text" list="prod-company-list" placeholder="Type company name"/>
+              <input class="p-input" id="prod-company-name" type="text" list="prod-company-list" placeholder="Type company name" style="min-width:320px"/>
               <datalist id="prod-company-list"></datalist>
             </div>
             <div class="field-group">
               <label class="p-label" for="prod-job-name">Job Name</label>
-              <input class="p-input" id="prod-job-name" type="text" list="prod-job-list" placeholder="Type product/job name"/>
+              <input class="p-input" id="prod-job-name" type="text" list="prod-job-list" placeholder="Type product/job name" style="min-width:320px"/>
               <datalist id="prod-job-list"></datalist>
             </div>
             <div class="field-group">
@@ -394,8 +395,8 @@
             <div class="field-group" style="min-width:140px">
               <label class="p-label" for="prod-table-status">Status</label>
               <select class="p-select" id="prod-table-status" style="width:100%">
-                <option value="all" selected>All</option>
-                <option value="pending">Pending</option>
+                <option value="pending" selected>Pending</option>
+                <option value="all">All</option>
                 <option value="completed">Completed</option>
               </select>
             </div>
@@ -451,6 +452,39 @@
                 </tr>
               </thead>
               <tbody id="prod-orders-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="production-page-detail-view" style="display:none">
+          <div class="form-row" style="flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;gap:12px">
+            <div class="field-group" style="min-width:180px;max-width:260px">
+              <label class="p-label" for="prod-detail-status">Mode</label>
+              <select class="p-select" id="prod-detail-status" style="width:100%">
+                <option value="pending" selected>Pending Orders</option>
+                <option value="all">All Orders</option>
+              </select>
+            </div>
+            <div class="field-group" style="padding-bottom:2px">
+              <button type="button" class="p-btn p-btn-ghost" id="btn-prod-detail-print">Print</button>
+            </div>
+          </div>
+          <div class="rates-table-wrap">
+            <table class="rates-table production-table" id="prod-detail-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Company</th>
+                  <th>Product/Job</th>
+                  <th>Pouch Type</th>
+                  <th>Pouch Size</th>
+                  <th>Quantity</th>
+                  <th title="(width × cylinder up) / 1000 × print factor (2 if double-side)">Open size</th>
+                  <th>Meter</th>
+                  <th>KG</th>
+                </tr>
+              </thead>
+              <tbody id="prod-detail-tbody"></tbody>
             </table>
           </div>
         </div>

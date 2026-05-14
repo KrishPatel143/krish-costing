@@ -12,7 +12,7 @@ import {
   deleteProductionOrder,
 } from '../db.js';
 import { MATERIALS, POUCH_TYPES, PRODUCTION_SINGLE_SIDE_POUCH_TYPES } from '../data/materials.js';
-import { fmt, fmtDate } from '../lib/formatter.js';
+import { fmt, fmtDate, fmtDateOnly } from '../lib/formatter.js';
 import { showToast } from './toast.js';
 
 const els = {};
@@ -138,6 +138,12 @@ function getFilteredProductionOrders() {
     }
   }
   return list;
+}
+
+function getDetailFilteredOrders() {
+  const mode = els.prodDetailStatus?.value || 'pending';
+  if (mode === 'all') return ordersCache.slice();
+  return ordersCache.filter((o) => normalizeOrderStatus(o) === 'pending');
 }
 
 function renderJobSuggestions(companyName) {
@@ -406,13 +412,93 @@ function dispatchTooltip(row) {
   const entries = dispatchEntries(row);
   if (!entries.length) return 'No dispatch yet';
   return entries
-    .map((e) => `${e.date || '-'}: ${fmtWhole(e.quantity)} pouch`)
+    .map((e) => `${fmtDateOnly(e.date)}: ${fmtWhole(e.quantity)} pouch`)
     .join('\n');
 }
 
 function openSizeDisplay(order) {
   const v = computeOpenSizeM2(order);
   return fmtWhole(v);
+}
+
+function renderDetailTable() {
+  if (!els.prodDetailTbody) return;
+  if (!ordersCache.length) {
+    els.prodDetailTbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--color-text-tertiary)">No production orders yet.</td></tr>';
+    return;
+  }
+  const visible = getDetailFilteredOrders();
+  if (!visible.length) {
+    els.prodDetailTbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--color-text-tertiary)">No orders in selected mode.</td></tr>';
+    return;
+  }
+  els.prodDetailTbody.innerHTML = visible.map((o) => `
+    <tr>
+      <td>${fmtDateOnly(o.orderDate)}</td>
+      <td>${escapeHtml(o.companyName || '-')}</td>
+      <td>${escapeHtml(o.jobName || '-')}</td>
+      <td style="font-size:12px;max-width:220px;line-height:1.35">${pouchTypeDisplayHtml(o.pouchType)}</td>
+      <td style="font-family:var(--mono)">${pouchSizeCellDisplay(o)}</td>
+      <td style="font-family:var(--mono)">${fmtUnitQty(o.quantity, o.quantityUnit)}</td>
+      <td style="font-family:var(--mono)">${openSizeDisplay(o)}</td>
+      <td style="font-family:var(--mono)">${fmtWhole(o.meter)}</td>
+      <td style="font-family:var(--mono)">${fmtWhole(o.kg)}</td>
+    </tr>
+  `).join('');
+}
+
+function printDetailTable() {
+  const table = byId('prod-detail-table');
+  if (!table) return;
+  const modeLabel = (els.prodDetailStatus?.value || 'pending') === 'all' ? 'All Orders' : 'Pending Orders';
+  const frame = document.createElement('iframe');
+  frame.setAttribute('aria-hidden', 'true');
+  frame.style.position = 'fixed';
+  frame.style.right = '0';
+  frame.style.bottom = '0';
+  frame.style.width = '0';
+  frame.style.height = '0';
+  frame.style.border = '0';
+  document.body.appendChild(frame);
+
+  const doc = frame.contentDocument || frame.contentWindow?.document;
+  if (!doc || !frame.contentWindow) {
+    frame.remove();
+    showToast('warn', 'Unable to initialize print preview.');
+    return;
+  }
+
+  doc.open();
+  doc.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8"/>
+        <title>Production Detail</title>
+        <style>
+          body{font-family:Arial,sans-serif;margin:16px;color:#111}
+          h2{margin:0 0 12px 0;font-size:18px}
+          table{width:100%;border-collapse:collapse;font-size:12px}
+          th,td{border:1px solid #cfcfcf;padding:6px 8px;vertical-align:top;text-align:left}
+          thead th{background:#f5f5f5}
+        </style>
+      </head>
+      <body>
+        <h2>Production Detail (${modeLabel})</h2>
+        ${table.outerHTML}
+      </body>
+    </html>
+  `);
+  doc.close();
+
+  const cleanup = () => {
+    setTimeout(() => frame.remove(), 300);
+  };
+  frame.contentWindow.addEventListener('afterprint', cleanup, { once: true });
+  frame.contentWindow.focus();
+  frame.contentWindow.print();
+  // Fallback cleanup for cases where afterprint does not fire.
+  setTimeout(cleanup, 3000);
 }
 
 function renderOrdersTable() {
@@ -433,7 +519,7 @@ function renderOrdersTable() {
       <td title="${o.savedAt ? fmtDate(o.savedAt) : ''}">
         ${editingRowId === o.id ? `
         <input class="p-input prod-edit-order-date" data-prod-id="${o.id}" type="date" value="${o.orderDate || ''}" style="width:140px"/>
-        ` : (o.orderDate || '-')}
+        ` : fmtDateOnly(o.orderDate)}
       </td>
       <td style="font-family:var(--mono)">${o.orderId || '-'}</td>
       <td style="font-family:var(--mono)">
@@ -675,6 +761,7 @@ function renderOrdersTable() {
       Object.assign(row, payload);
       editingRowId = null;
       renderOrdersTable();
+      renderDetailTable();
       showToast('success', 'Order updated.');
     });
   });
@@ -708,6 +795,7 @@ function renderOrdersTable() {
       }
       if (qtyInput) qtyInput.value = '';
       renderOrdersTable();
+      renderDetailTable();
       showToast('success', 'Dispatch added.');
     });
   });
@@ -726,6 +814,7 @@ function renderOrdersTable() {
       }
       Object.assign(row, patch);
       renderOrdersTable();
+      renderDetailTable();
       showToast('success', 'Order marked completed.');
     });
   });
@@ -746,6 +835,7 @@ function renderOrdersTable() {
       renderCompanySuggestions();
       renderJobSuggestions(els.companyName?.value || '');
       renderOrdersTable();
+      renderDetailTable();
       showToast('success', 'Order deleted.');
     });
   });
@@ -766,6 +856,7 @@ async function refreshOrders() {
   renderOrderTableCompanyFilter();
   renderJobSuggestions(els.companyName?.value || '');
   renderOrdersTable();
+  renderDetailTable();
 }
 
 async function resetFormKeepContext() {
@@ -819,6 +910,7 @@ function setupPageToggle() {
   if (!wrap) return;
   const newOrder = byId('production-page-new-order');
   const ordersTable = byId('production-page-orders-table');
+  const detailView = byId('production-page-detail-view');
   wrap.querySelectorAll('button[data-page]').forEach((btn) => {
     btn.addEventListener('click', () => {
       wrap.querySelectorAll('button[data-page]').forEach((b) => b.classList.remove('active'));
@@ -826,7 +918,9 @@ function setupPageToggle() {
       const page = btn.getAttribute('data-page');
       if (newOrder) newOrder.style.display = page === 'new-order' ? 'block' : 'none';
       if (ordersTable) ordersTable.style.display = page === 'orders-table' ? 'block' : 'none';
+      if (detailView) detailView.style.display = page === 'detail-view' ? 'block' : 'none';
       if (page === 'orders-table') renderOrdersTable();
+      if (page === 'detail-view') renderDetailTable();
     });
   });
 }
@@ -852,11 +946,13 @@ function bindEvents() {
   els.prodTablePouchType?.addEventListener('change', () => renderOrdersTable());
   byId('btn-prod-table-clear-filters')?.addEventListener('click', () => {
     if (els.prodTableSearch) els.prodTableSearch.value = '';
-    if (els.prodTableStatus) els.prodTableStatus.value = 'all';
+    if (els.prodTableStatus) els.prodTableStatus.value = 'pending';
     if (els.prodTableCompany) els.prodTableCompany.value = '';
     if (els.prodTablePouchType) els.prodTablePouchType.value = '';
     renderOrdersTable();
   });
+  els.prodDetailStatus?.addEventListener('change', renderDetailTable);
+  byId('btn-prod-detail-print')?.addEventListener('click', printDetailTable);
 }
 
 function cacheElements() {
@@ -885,6 +981,8 @@ function cacheElements() {
   els.prodTableStatus = byId('prod-table-status');
   els.prodTableCompany = byId('prod-table-company');
   els.prodTablePouchType = byId('prod-table-pouch-type');
+  els.prodDetailStatus = byId('prod-detail-status');
+  els.prodDetailTbody = byId('prod-detail-tbody');
 }
 
 export async function renderProductionOrders() {
