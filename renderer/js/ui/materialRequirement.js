@@ -1,10 +1,11 @@
 /**
  * @file materialRequirement.js
  * @description Material Requirement report: pending orders only. Split pouch types by "+",
- * group by material and open size, sum KG with per-line breakdown (company, job).
+ * group by material and open size, sum KG and roll meters with per-line breakdown (company, job).
  */
 
 import { getProductionOrders } from '../db.js';
+import { MATERIALS } from '../data/materials.js';
 import {
   calculateProduction,
   computeOpenSizeM2,
@@ -51,12 +52,42 @@ function openSizeKey(order) {
 }
 
 /**
- * @typedef {{ kg: number, companyName: string, jobName: string }} MrLineItem
+ * Resolve GSM for a material name from the requirement roll-up
+ * (e.g. "One Side Transparent" matches "One Side Transparent (OST)").
+ * @param {string} name
+ * @returns {number}
+ */
+function gsmForMaterialLabel(name) {
+  const n = String(name || '').trim().toLowerCase();
+  if (!n) return 0;
+  for (const m of Object.values(MATERIALS)) {
+    const lab = String(m.label || '').toLowerCase();
+    const base = lab.replace(/\s*\([^)]*\)\s*$/, '').trim();
+    if (lab === n || base === n) return Number(m.gsm) || 0;
+  }
+  return 0;
+}
+
+/**
+ * Roll length (m) from weight, material GSM, and web width.
+ * meters = (kg × 1_000_000) / (gsm × widthMm)
+ * @param {number} kg
+ * @param {number} gsm
+ * @param {number} widthMm
+ * @returns {number}
+ */
+function rollMetersFromKg(kg, gsm, widthMm) {
+  if (!(gsm > 0) || !(widthMm > 0) || !(kg > 0)) return 0;
+  return (kg * 1_000_000) / (gsm * widthMm);
+}
+
+/**
+ * @typedef {{ kg: number, meters: number, companyName: string, jobName: string }} MrLineItem
  * @param {object[]} orders  Already filtered (e.g. pending only).
- * @returns {Record<string, Record<number, { totalKg: number, items: MrLineItem[] }>>}
+ * @returns {Record<string, Record<number, { totalKg: number, totalMeters: number, items: MrLineItem[] }>>}
  */
 export function buildMaterialRequirementMap(orders) {
-  /** @type {Record<string, Record<number, { totalKg: number, items: MrLineItem[] }>>} */
+  /** @type {Record<string, Record<number, { totalKg: number, totalMeters: number, items: MrLineItem[] }>>} */
   const map = {};
 
   for (const o of orders) {
@@ -65,17 +96,22 @@ export function buildMaterialRequirementMap(orders) {
 
     const openSz = openSizeKey(o);
     const kgLine = lineKgRounded(o);
+    const widthMm = Number(o.widthMm);
     const companyName = String(o.companyName || '').trim();
     const jobName = String(o.jobName || '').trim();
-    const line = { kg: kgLine, companyName, jobName };
 
     for (const mat of materials) {
+      const gsm = gsmForMaterialLabel(mat);
+      const metersLine = rollMetersFromKg(kgLine, gsm, widthMm);
+      const line = { kg: kgLine, meters: metersLine, companyName, jobName };
+
       if (!map[mat]) map[mat] = {};
       if (!map[mat][openSz]) {
-        map[mat][openSz] = { totalKg: 0, items: [] };
+        map[mat][openSz] = { totalKg: 0, totalMeters: 0, items: [] };
       }
       const cell = map[mat][openSz];
       cell.totalKg += kgLine;
+      cell.totalMeters += metersLine;
       cell.items.push(line);
     }
   }
@@ -107,12 +143,13 @@ function renderReportInto(root, dataMap) {
       .sort((a, b) => a - b);
 
     const rows = sizes.map((sz) => {
-      const { totalKg, items } = byOpen[sz];
+      const { totalKg, totalMeters, items } = byOpen[sz];
       const detailInner = items.map((item) => `<div>${formatBreakdownLine(item)}</div>`).join('');
       return `
         <tr>
           <td style="font-family:var(--mono)">${fmtWhole(sz)}</td>
           <td style="font-family:var(--mono)">${fmtWhole(totalKg)}</td>
+          <td style="font-family:var(--mono)">${fmtWhole(totalMeters)}</td>
           <td style="font-size:12px;line-height:1.45;color:var(--color-text-secondary);max-width:420px"><div style="display:flex;flex-direction:column;gap:4px">${detailInner}</div></td>
         </tr>`;
     }).join('');
@@ -126,6 +163,7 @@ function renderReportInto(root, dataMap) {
               <tr>
                 <th>Open Size</th>
                 <th>Total KG</th>
+                <th>Meters</th>
                 <th>Breakdown</th>
               </tr>
             </thead>
@@ -162,6 +200,7 @@ function buildSummaryRows(dataMap) {
         material: name,
         size: sz,
         kg: byOpen[sz].totalKg,
+        meters: byOpen[sz].totalMeters,
       });
     }
   }
@@ -177,6 +216,7 @@ function buildDetailRows(dataMap) {
           material: name,
           size: sz,
           kg: item.kg,
+          meters: item.meters,
           company: item.companyName || '',
           job: item.jobName || '',
         });
@@ -217,6 +257,7 @@ function printMaterialRequirement() {
       <td>${escapeHtml(r.material)}</td>
       <td style="font-family:Consolas,monospace">${fmtWhole(r.size)}</td>
       <td style="font-family:Consolas,monospace">${fmtWhole(r.kg)}</td>
+      <td style="font-family:Consolas,monospace">${fmtWhole(r.meters)}</td>
     </tr>
   `).join('');
 
@@ -257,6 +298,7 @@ function printMaterialRequirement() {
               <th>Material</th>
               <th>Open Size</th>
               <th>KG</th>
+              <th>Meters</th>
             </tr>
           </thead>
           <tbody>${bodyRows}</tbody>
@@ -281,24 +323,26 @@ function exportMaterialRequirement() {
     return;
   }
 
-  const summaryHeader = ['Material', 'Open Size', 'KG'].map(csvCell).join(',');
+  const summaryHeader = ['Material', 'Open Size', 'KG', 'Meters'].map(csvCell).join(',');
   const summaryLines = [
     summaryHeader,
     ...buildSummaryRows(lastDataMap).map((r) => [
       csvCell(r.material),
       csvCell(r.size),
       csvCell(Math.round(Number(r.kg) || 0)),
+      csvCell(Math.round(Number(r.meters) || 0)),
     ].join(',')),
   ];
   downloadCsv('material-requirement-summary.csv', summaryLines);
 
-  const detailHeader = ['Material', 'Open Size', 'KG', 'Company', 'Product/Job'].map(csvCell).join(',');
+  const detailHeader = ['Material', 'Open Size', 'KG', 'Meters', 'Company', 'Product/Job'].map(csvCell).join(',');
   const detailLines = [
     detailHeader,
     ...buildDetailRows(lastDataMap).map((r) => [
       csvCell(r.material),
       csvCell(r.size),
       csvCell(Math.round(Number(r.kg) || 0)),
+      csvCell(Math.round(Number(r.meters) || 0)),
       csvCell(r.company),
       csvCell(r.job),
     ].join(',')),
