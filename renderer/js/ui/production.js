@@ -216,7 +216,7 @@ function productionPrintFactor(printType) {
 }
 
 /** Same as calculateProduction: ((widthMm × cylinderUpMm) / 1000) × printFactor */
-function computeOpenSizeM2(order) {
+export function computeOpenSizeM2(order) {
   const widthMm = numberOrNull(order?.widthMm) ?? 0;
   const cylinderUpMm = numberOrNull(order?.cylinderUpMm) ?? 0;
   const pf = productionPrintFactor(order?.printType);
@@ -228,6 +228,26 @@ function pouchTypeLabel(pouchTypeKey) {
     return PRODUCTION_SINGLE_SIDE_POUCH_TYPES[pouchTypeKey].label;
   }
   return POUCH_TYPES[pouchTypeKey]?.label ?? (pouchTypeKey || '—');
+}
+
+/**
+ * Material names for requirement roll-up: split pouch label on "+", trim, dedupe.
+ * e.g. "Cromo + Cromo" → ["Cromo"]; "Medical Paper + One Side Transparent" → both sides.
+ * @param {string} pouchTypeKey
+ * @returns {string[]}
+ */
+export function distinctMaterialsFromPouchTypeKey(pouchTypeKey) {
+  const label = pouchTypeLabel(pouchTypeKey);
+  if (!label || label === '—') return [];
+  const seen = new Set();
+  const out = [];
+  for (const part of label.split('+')) {
+    const t = part.trim();
+    if (!t || seen.has(t)) continue;
+    seen.add(t);
+    out.push(t);
+  }
+  return out;
 }
 
 /**
@@ -263,10 +283,12 @@ function pouchSizeCellDisplay(o) {
   return `${fmtWhole(o.widthMm)}*${fmtWhole(o.heightMm)}`;
 }
 
-function calculateProduction(entry) {
+export function calculateProduction(entry) {
+  const wasteFactor = 1.05;
   const widthMm = numberOrNull(entry.widthMm) ?? 0;
   const cylinderUpMm = numberOrNull(entry.cylinderUpMm) ?? 0;
-  const qty = numberOrNull(entry.quantity) ?? 0;
+  const rawQty = numberOrNull(entry.quantity) ?? 0;
+const qty = Math.round(rawQty * wasteFactor);
   const unit = entry.quantityUnit;
   const printFactor = productionPrintFactor(entry.printType);
 

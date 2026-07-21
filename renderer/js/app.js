@@ -11,6 +11,7 @@ import { initFoilCalc } from './ui/foilCalc.js';
 import { initRates, renderRatesTable } from './ui/rates.js';
 import { initHistory, renderHistory } from './ui/history.js';
 import { initProduction, renderProductionOrders } from './ui/production.js';
+import { initMaterialRequirement, renderMaterialRequirement } from './ui/materialRequirement.js';
 
 async function boot() {
   // 1. Pre-warm DB caches (fetches rates from LowDB via IPC)
@@ -20,12 +21,14 @@ async function boot() {
   initTabs();
   onTabActivate('history', renderHistory);
   onTabActivate('production', renderProductionOrders);
+  onTabActivate('material-req', renderMaterialRequirement);
 
   // 3. Init each feature module (attaches event listeners)
   initPaperCalc();
   initFoilCalc();
   initRates();
   initHistory();
+  initMaterialRequirement();
   await initProduction();
 
   // 4. Render static tables that need data at startup
