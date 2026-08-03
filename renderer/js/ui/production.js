@@ -77,11 +77,10 @@ function renderCompanySuggestions() {
   els.companyList.innerHTML = companies.map((name) => `<option value="${name}"></option>`).join('');
 }
 
-function renderOrderTableCompanyFilter() {
-  if (!els.prodTableCompany) return;
-  const prev = els.prodTableCompany.value;
+function renderCompanyFilterSelect(sel) {
+  if (!sel) return;
+  const prev = sel.value;
   const companies = buildUniqueCompanyList(ordersCache).sort((a, b) => a.localeCompare(b));
-  const sel = els.prodTableCompany;
   sel.textContent = '';
   const allOpt = document.createElement('option');
   allOpt.value = '';
@@ -94,6 +93,11 @@ function renderOrderTableCompanyFilter() {
     sel.appendChild(opt);
   }
   if (prev && companies.includes(prev)) sel.value = prev;
+}
+
+function renderOrderTableCompanyFilter() {
+  renderCompanyFilterSelect(els.prodTableCompany);
+  renderCompanyFilterSelect(els.prodDetailCompany);
 }
 
 /** Orders visible in the table after search / status / company / pouch type filters. */
@@ -141,9 +145,23 @@ function getFilteredProductionOrders() {
 }
 
 function getDetailFilteredOrders() {
-  const mode = els.prodDetailStatus?.value || 'pending';
-  if (mode === 'all') return ordersCache.slice();
-  return ordersCache.filter((o) => normalizeOrderStatus(o) === 'pending');
+  let list = ordersCache.slice();
+  const status = els.prodDetailStatus?.value || 'pending';
+  const companyNeedle = (els.prodDetailCompany?.value || '').trim().toLowerCase();
+  const pouchKey = (els.prodDetailPouchType?.value || '').trim();
+
+  if (status === 'pending') {
+    list = list.filter((o) => normalizeOrderStatus(o) === 'pending');
+  } else if (status === 'completed') {
+    list = list.filter((o) => normalizeOrderStatus(o) === 'completed');
+  }
+  if (companyNeedle) {
+    list = list.filter((o) => (o.companyName || '').trim().toLowerCase() === companyNeedle);
+  }
+  if (pouchKey) {
+    list = list.filter((o) => String(o.pouchType || '') === pouchKey);
+  }
+  return list;
 }
 
 function renderJobSuggestions(companyName) {
@@ -451,7 +469,7 @@ function renderDetailTable() {
   }
   const visible = getDetailFilteredOrders();
   if (!visible.length) {
-    els.prodDetailTbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--color-text-tertiary)">No orders in selected mode.</td></tr>';
+    els.prodDetailTbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--color-text-tertiary)">No orders match your filters.</td></tr>';
     return;
   }
   els.prodDetailTbody.innerHTML = visible.map((o) => `
@@ -469,18 +487,27 @@ function renderDetailTable() {
   `).join('');
 }
 
-function printDetailTable() {
-  const table = byId('prod-detail-table');
-  if (!table) return;
-  const modeLabel = (els.prodDetailStatus?.value || 'pending') === 'all' ? 'All Orders' : 'Pending Orders';
+function statusFilterLabel(value) {
+  if (value === 'completed') return 'Completed';
+  if (value === 'all') return 'All statuses';
+  return 'Pending';
+}
+
+function filterSummaryLine({ statusValue, companyValue, pouchValue, searchValue }) {
+  const parts = [statusFilterLabel(statusValue || 'pending')];
+  const company = (companyValue || '').trim();
+  if (company) parts.push(`Company: ${company}`);
+  const pouch = (pouchValue || '').trim();
+  if (pouch) parts.push(`Pouch: ${pouchTypeLabel(pouch)}`);
+  const search = (searchValue || '').trim();
+  if (search) parts.push(`Search: “${search}”`);
+  return parts.join(' · ');
+}
+
+function openProductionPrintFrame(title, subtitle, tableHtml) {
   const frame = document.createElement('iframe');
   frame.setAttribute('aria-hidden', 'true');
-  frame.style.position = 'fixed';
-  frame.style.right = '0';
-  frame.style.bottom = '0';
-  frame.style.width = '0';
-  frame.style.height = '0';
-  frame.style.border = '0';
+  frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
   document.body.appendChild(frame);
 
   const doc = frame.contentDocument || frame.contentWindow?.document;
@@ -496,18 +523,21 @@ function printDetailTable() {
     <html>
       <head>
         <meta charset="utf-8"/>
-        <title>Production Detail</title>
+        <title>${escapeHtml(title)}</title>
         <style>
           body{font-family:Arial,sans-serif;margin:16px;color:#111}
-          h2{margin:0 0 12px 0;font-size:18px}
-          table{width:100%;border-collapse:collapse;font-size:12px}
-          th,td{border:1px solid #cfcfcf;padding:6px 8px;vertical-align:top;text-align:left}
+          h2{margin:0 0 4px 0;font-size:18px}
+          p.sub{margin:0 0 12px 0;font-size:12px;color:#555}
+          table{width:100%;border-collapse:collapse;font-size:11px}
+          th,td{border:1px solid #cfcfcf;padding:5px 6px;vertical-align:top;text-align:left}
           thead th{background:#f5f5f5}
+          @media print{body{margin:8px}}
         </style>
       </head>
       <body>
-        <h2>Production Detail (${modeLabel})</h2>
-        ${table.outerHTML}
+        <h2>${escapeHtml(title)}</h2>
+        <p class="sub">${escapeHtml(subtitle)}</p>
+        ${tableHtml}
       </body>
     </html>
   `);
@@ -519,8 +549,99 @@ function printDetailTable() {
   frame.contentWindow.addEventListener('afterprint', cleanup, { once: true });
   frame.contentWindow.focus();
   frame.contentWindow.print();
-  // Fallback cleanup for cases where afterprint does not fire.
   setTimeout(cleanup, 3000);
+}
+
+function printOrdersTable() {
+  const visible = getFilteredProductionOrders();
+  if (!visible.length) {
+    showToast('info', 'No orders match your filters.');
+    return;
+  }
+
+  const rows = visible.map((o) => `
+    <tr>
+      <td>${escapeHtml(fmtDateOnly(o.orderDate))}</td>
+      <td>${escapeHtml(o.orderId || '-')}</td>
+      <td>${escapeHtml((o.poNumber || '').trim() || '—')}</td>
+      <td>${escapeHtml(printTypeLabel(o.printType))}</td>
+      <td>${escapeHtml(o.companyName || '-')}</td>
+      <td>${escapeHtml(o.jobName || '-')}</td>
+      <td>${escapeHtml(pouchTypeLabel(o.pouchType))}</td>
+      <td>${escapeHtml(pouchSizeCellDisplay(o))}</td>
+      <td>${escapeHtml(fmtUnitQty(o.quantity, o.quantityUnit))}</td>
+      <td>${escapeHtml(fmt(o.rate || 0, 2))}</td>
+      <td>${escapeHtml(openSizeDisplay(o))}</td>
+      <td>${escapeHtml(fmtWhole(o.meter))}</td>
+      <td>${escapeHtml(fmtWhole(o.kg))}</td>
+      <td>${escapeHtml(fmtWhole(dispatchTotal(o)))}</td>
+      <td>${escapeHtml(orderStatusLabel(o))}</td>
+    </tr>
+  `).join('');
+
+  const tableHtml = `
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th><th>Order ID</th><th>PO</th><th>Print</th><th>Company</th>
+          <th>Job</th><th>Pouch Type</th><th>Size</th><th>Qty</th><th>Rate</th>
+          <th>Open size</th><th>Meter</th><th>KG</th><th>Dispatch</th><th>Status</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+
+  const subtitle = filterSummaryLine({
+    statusValue: els.prodTableStatus?.value,
+    companyValue: els.prodTableCompany?.value,
+    pouchValue: els.prodTablePouchType?.value,
+    searchValue: els.prodTableSearch?.value,
+  }) + ` · ${visible.length} order${visible.length === 1 ? '' : 's'}`;
+
+  openProductionPrintFrame('Production Orders', subtitle, tableHtml);
+}
+
+function printDetailTable() {
+  const visible = getDetailFilteredOrders();
+  if (!visible.length) {
+    showToast('info', 'No orders match your filters.');
+    return;
+  }
+
+  const rows = visible.map((o) => `
+    <tr>
+      <td>${escapeHtml(fmtDateOnly(o.orderDate))}</td>
+      <td>${escapeHtml(o.companyName || '-')}</td>
+      <td>${escapeHtml(o.jobName || '-')}</td>
+      <td>${escapeHtml(pouchTypeLabel(o.pouchType))}</td>
+      <td>${escapeHtml(pouchSizeCellDisplay(o))}</td>
+      <td>${escapeHtml(fmtUnitQty(o.quantity, o.quantityUnit))}</td>
+      <td>${escapeHtml(openSizeDisplay(o))}</td>
+      <td>${escapeHtml(fmtWhole(o.meter))}</td>
+      <td>${escapeHtml(fmtWhole(o.kg))}</td>
+    </tr>
+  `).join('');
+
+  const tableHtml = `
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th><th>Company</th><th>Product/Job</th><th>Pouch Type</th>
+          <th>Pouch Size</th><th>Quantity</th><th>Open size</th><th>Meter</th><th>KG</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+
+  const subtitle = filterSummaryLine({
+    statusValue: els.prodDetailStatus?.value,
+    companyValue: els.prodDetailCompany?.value,
+    pouchValue: els.prodDetailPouchType?.value,
+  }) + ` · ${visible.length} order${visible.length === 1 ? '' : 's'}`;
+
+  openProductionPrintFrame('Production Detail', subtitle, tableHtml);
 }
 
 function renderOrdersTable() {
@@ -973,7 +1094,17 @@ function bindEvents() {
     if (els.prodTablePouchType) els.prodTablePouchType.value = '';
     renderOrdersTable();
   });
+  byId('btn-prod-table-print')?.addEventListener('click', printOrdersTable);
+
   els.prodDetailStatus?.addEventListener('change', renderDetailTable);
+  els.prodDetailCompany?.addEventListener('change', renderDetailTable);
+  els.prodDetailPouchType?.addEventListener('change', renderDetailTable);
+  byId('btn-prod-detail-clear-filters')?.addEventListener('click', () => {
+    if (els.prodDetailStatus) els.prodDetailStatus.value = 'pending';
+    if (els.prodDetailCompany) els.prodDetailCompany.value = '';
+    if (els.prodDetailPouchType) els.prodDetailPouchType.value = '';
+    renderDetailTable();
+  });
   byId('btn-prod-detail-print')?.addEventListener('click', printDetailTable);
 }
 
@@ -1004,6 +1135,8 @@ function cacheElements() {
   els.prodTableCompany = byId('prod-table-company');
   els.prodTablePouchType = byId('prod-table-pouch-type');
   els.prodDetailStatus = byId('prod-detail-status');
+  els.prodDetailCompany = byId('prod-detail-company');
+  els.prodDetailPouchType = byId('prod-detail-pouch-type');
   els.prodDetailTbody = byId('prod-detail-tbody');
 }
 

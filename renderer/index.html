@@ -432,8 +432,9 @@
                 </optgroup>
               </select>
             </div>
-            <div class="field-group" style="padding-bottom:2px">
+            <div class="field-group" style="padding-bottom:2px;display:flex;gap:8px;flex-wrap:wrap">
               <button type="button" class="p-btn p-btn-ghost" id="btn-prod-table-clear-filters">Clear filters</button>
+              <button type="button" class="p-btn p-btn-ghost" id="btn-prod-table-print">Print</button>
             </div>
           </div>
           <div class="rates-table-wrap">
@@ -465,14 +466,41 @@
 
         <div id="production-page-detail-view" style="display:none">
           <div class="form-row" style="flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;gap:12px">
-            <div class="field-group" style="min-width:180px;max-width:260px">
-              <label class="p-label" for="prod-detail-status">Mode</label>
+            <div class="field-group" style="min-width:160px;max-width:220px">
+              <label class="p-label" for="prod-detail-status">Status</label>
               <select class="p-select" id="prod-detail-status" style="width:100%">
-                <option value="pending" selected>Pending Orders</option>
-                <option value="all">All Orders</option>
+                <option value="pending" selected>Pending</option>
+                <option value="all">All</option>
+                <option value="completed">Completed</option>
               </select>
             </div>
-            <div class="field-group" style="padding-bottom:2px">
+            <div class="field-group" style="min-width:180px;flex:1;max-width:260px">
+              <label class="p-label" for="prod-detail-company">Company</label>
+              <select class="p-select" id="prod-detail-company" style="width:100%">
+                <option value="">All companies</option>
+              </select>
+            </div>
+            <div class="field-group" style="min-width:200px;flex:1;max-width:280px">
+              <label class="p-label" for="prod-detail-pouch-type">Pouch Type</label>
+              <select class="p-select" id="prod-detail-pouch-type" style="width:100%">
+                <option value="">All pouch types</option>
+                <optgroup label="Single web (kg only)">
+                  <option value="prod_medical_paper">Medical Paper</option>
+                  <option value="prod_cromo">Cromo</option>
+                  <option value="prod_4ply">4 Ply</option>
+                  <option value="prod_poster">Poster</option>
+                </optgroup>
+                <optgroup label="Laminate pouch">
+                  <option value="med_ost">Medical Paper + One Side Transparent</option>
+                  <option value="cromo_ost">Cromo + One Side Transparent</option>
+                  <option value="cromo_cromo">Cromo + Cromo</option>
+                  <option value="ply_ply">4 Ply + 4 Ply</option>
+                  <option value="poster_poster">Poster + Poster</option>
+                </optgroup>
+              </select>
+            </div>
+            <div class="field-group" style="padding-bottom:2px;display:flex;gap:8px;flex-wrap:wrap">
+              <button type="button" class="p-btn p-btn-ghost" id="btn-prod-detail-clear-filters">Clear filters</button>
               <button type="button" class="p-btn p-btn-ghost" id="btn-prod-detail-print">Print</button>
             </div>
           </div>
