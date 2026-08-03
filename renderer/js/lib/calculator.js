@@ -135,10 +135,10 @@ export function labourForFlex(height) {
 
 /**
  * Full paper pouch cost calculation.
- * Profit on material cost: 25% for plain (no print), 30% for one-side / two-side.
- * @param {{ pouchTypeKey, height, width, inkCoverage, printType?, quantity, rates }} p
+ * Profit % is user-editable (default 30% of material cost).
+ * @param {{ pouchTypeKey, height, width, inkCoverage, printType?, quantity, rates, profitPercent? }} p
  */
-export function calcPaperPouch({ pouchTypeKey, height, width, inkCoverage, printType = 'one_side', quantity, rates }) {
+export function calcPaperPouch({ pouchTypeKey, height, width, inkCoverage, printType = 'one_side', quantity, rates, profitPercent = 30 }) {
   const pouchType = POUCH_TYPES[pouchTypeKey];
   const inkKey = inkCoverage === 'half' ? 'ink_half' : 'ink_full';
   const areaSqM = (height * width) / 1_000_000;
@@ -151,7 +151,6 @@ export function calcPaperPouch({ pouchTypeKey, height, width, inkCoverage, print
   const ink = calcMaterial(areaSqM, inkGsm, rates[inkKey]);
 
   const totalMatCostPerPouch = s1.costPerPouch + s2.costPerPouch + ink.costPerPouch;
-  const profitPercent = printType === 'plain' ? 25 : 30;
   const profitPerPouch = totalMatCostPerPouch * (profitPercent / 100);
   const { labourPerPouch, labourExtra, labourReason } = labourForPaper(pouchTypeKey, height);
   const finalPerPouch = totalMatCostPerPouch + profitPerPouch + labourPerPouch;
@@ -179,9 +178,10 @@ export function calcPaperPouch({ pouchTypeKey, height, width, inkCoverage, print
 
 /**
  * Full flexible pouch cost calculation.
- * @param {{ height, width, inkCoverage, layers: Array<{matKey,mic}>, quantity, rates, paperRates, targetKg? }} p
+ * Profit % is user-editable (default 30% of material cost).
+ * @param {{ height, width, inkCoverage, layers: Array<{matKey,mic}>, quantity, rates, paperRates, targetKg?, profitPercent? }} p
  */
-export function calcFlexiblePouch({ height, width, inkCoverage, printType = 'one_side', layers, quantity: rawQty, rates, paperRates, targetKg }) {
+export function calcFlexiblePouch({ height, width, inkCoverage, printType = 'one_side', layers, quantity: rawQty, rates, paperRates, targetKg, profitPercent = 30 }) {
   const inkKey = inkCoverage === 'half' ? 'ink_half' : 'ink_full';
   const areaSqM = (height * width) / 1_000_000;
 
@@ -196,7 +196,7 @@ export function calcFlexiblePouch({ height, width, inkCoverage, printType = 'one
   const inkCalc = calcMaterial(areaSqM, inkGsm, paperRates[inkKey]);
   const layerMatCost = layerCalcs.reduce((s, l) => s + l.costPerPouch, 0);
   const totalMatCostPerPouch = layerMatCost + inkCalc.costPerPouch;
-  const profitPerPouch = totalMatCostPerPouch * 0.30;
+  const profitPerPouch = totalMatCostPerPouch * (profitPercent / 100);
   const { labourPerPouch, labourExtra, labourReason } = labourForFlex(height);
   const finalPerPouch = totalMatCostPerPouch + profitPerPouch + labourPerPouch;
   const totalWastageKgPerPouch = layerCalcs.reduce((s, l) => s + l.wastageKg, 0) + inkCalc.wastageKg;
@@ -221,6 +221,7 @@ export function calcFlexiblePouch({ height, width, inkCoverage, printType = 'one
   return {
     height, width, quantity, areaSqM,
     layers, layerCalcs, inkKey, inkCalc, inkCoverage, printType, paperRates, rates,
+    profitPercent,
     totalMatCostPerPouch, profitPerPouch,
     labourPerPouch, labourExtra, labourReason,
     finalPerPouch, finalTotal, qtyTotals,

@@ -15,6 +15,7 @@ import { toggleSection } from './tabs.js';
 // ─── Form readers ─────────────────────────────────────────────────────────────
 
 function readForm() {
+  const profitRaw = parseFloat(document.getElementById('paper-profit')?.value);
   return {
     pouchTypeKey: document.getElementById('pouch-type').value,
     height:       parseFloat(document.getElementById('height').value),
@@ -22,6 +23,7 @@ function readForm() {
     inkCoverage:  document.querySelector('input[name="ink"]:checked')?.value ?? 'half',
     printType:    document.querySelector('input[name="print-type"]:checked')?.value ?? 'one_side',
     quantity:     parseInt(document.getElementById('quantity').value) || 1,
+    profitPercent: Number.isFinite(profitRaw) && profitRaw >= 0 ? profitRaw : 30,
   };
 }
 
@@ -40,7 +42,7 @@ function hideError() {
 // ─── Calculate ────────────────────────────────────────────────────────────────
 
 async function calculate() {
-  const { pouchTypeKey, height, width, inkCoverage, printType, quantity } = readForm();
+  const { pouchTypeKey, height, width, inkCoverage, printType, quantity, profitPercent } = readForm();
 
   if (!height || !width || height <= 0 || width <= 0) {
     return showError('Please enter valid Height and Width (positive numbers).');
@@ -48,7 +50,7 @@ async function calculate() {
   hideError();
 
   const rates  = getRatesSync();
-  const result = calcPaperPouch({ pouchTypeKey, height, width, inkCoverage, printType, quantity, rates });
+  const result = calcPaperPouch({ pouchTypeKey, height, width, inkCoverage, printType, quantity, rates, profitPercent });
   renderResults(result);
 
   await addHistory({

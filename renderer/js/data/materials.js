@@ -7,7 +7,7 @@
 /** @type {Record<string, { label: string, gsm: number }>} */
 export const MATERIALS = {
   med: { label: 'Medical Paper', gsm: 60 },
-  ost: { label: 'One Side Transparent (OST)', gsm: 55 },
+  ost: { label: 'One Side Transparent (OST)', gsm: 51 },
   cromo: { label: 'Cromo', gsm: 75 },
   ply: { label: '4 Ply', gsm: 118 },
   poster: { label: 'Poster', gsm: 60 },

@@ -98,10 +98,16 @@
         <div class="divider"></div>
 
         <div>
-          <div class="section-label" style="margin-bottom:8px">Step 4 — Quantity</div>
-          <div class="field-group" style="max-width:200px">
-            <label class="p-label" for="quantity">Number of pouches</label>
-            <input class="p-input" type="number" id="quantity" value="1000" min="1" style="width:100%"/>
+          <div class="section-label" style="margin-bottom:8px">Step 4 — Quantity &amp; Profit</div>
+          <div class="form-row" style="max-width:480px">
+            <div class="field-group">
+              <label class="p-label" for="quantity">Number of pouches</label>
+              <input class="p-input" type="number" id="quantity" value="1000" min="1" style="width:100%"/>
+            </div>
+            <div class="field-group">
+              <label class="p-label" for="paper-profit">Profit Margin (%)</label>
+              <input class="p-input" type="number" id="paper-profit" value="30" min="0" step="0.01" style="width:100%"/>
+            </div>
           </div>
         </div>
 
