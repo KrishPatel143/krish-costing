@@ -434,11 +434,9 @@ function normalizeOrderStatus(row) {
   return s === 'completed' ? 'completed' : 'pending';
 }
 
-/** NOS orders only: total dispatched pouches ≥ ordered quantity. */
+/** Auto-complete when total dispatched ≥ ordered qty (NOS pouches or KG). */
 function shouldAutoCompleteOrder(row) {
   if (normalizeOrderStatus(row) === 'completed') return false;
-  const unit = String(row?.quantityUnit || 'nos').toLowerCase();
-  if (unit !== 'nos') return false;
   const ordered = Number(row?.quantity) || 0;
   if (ordered <= 0) return false;
   return dispatchTotal(row) >= ordered;
@@ -448,11 +446,16 @@ function orderStatusLabel(row) {
   return normalizeOrderStatus(row) === 'completed' ? 'Completed' : 'Pending';
 }
 
+function dispatchUnitLabel(row) {
+  return String(row?.quantityUnit || 'nos').toLowerCase() === 'kg' ? 'kg' : 'pouch';
+}
+
 function dispatchTooltip(row) {
   const entries = dispatchEntries(row);
   if (!entries.length) return 'No dispatch yet';
+  const unit = dispatchUnitLabel(row);
   return entries
-    .map((e) => `${fmtDateOnly(e.date)}: ${fmtWhole(e.quantity)} pouch`)
+    .map((e) => `${fmtDateOnly(e.date)}: ${fmtWhole(e.quantity)} ${unit}`)
     .join('\n');
 }
 
@@ -737,7 +740,7 @@ function renderOrdersTable() {
               </div>
               <div style="display:flex;gap:6px;align-items:center">
                 <input class="p-input prod-add-dispatch-date" data-prod-id="${o.id}" type="date" value="${todayIsoDate()}" style="width:140px"/>
-                <input class="p-input prod-add-dispatch-qty" data-prod-id="${o.id}" type="number" min="1" step="1" placeholder="Qty" style="width:90px"/>
+                <input class="p-input prod-add-dispatch-qty" data-prod-id="${o.id}" type="number" min="0.001" step="${String(o.quantityUnit).toLowerCase() === 'kg' ? '0.001' : '1'}" placeholder="${String(o.quantityUnit).toLowerCase() === 'kg' ? 'KG' : 'Qty'}" style="width:90px"/>
                 <button class="p-btn prod-add-dispatch-btn" data-prod-id="${o.id}" type="button" style="padding:6px 8px">Add</button>
               </div>
             </div>
