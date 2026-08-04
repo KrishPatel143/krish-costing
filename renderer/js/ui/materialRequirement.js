@@ -69,16 +69,16 @@ function gsmForMaterialLabel(name) {
 }
 
 /**
- * Roll length (m) from weight, material GSM, and web width.
- * meters = (kg × 1_000_000) / (gsm × widthMm)
+ * Roll length (m) from weight, material GSM, and open size (mm).
+ * meters = (kg × 1_000_000) / (gsm × openSizeMm)
  * @param {number} kg
  * @param {number} gsm
- * @param {number} widthMm
+ * @param {number} openSizeMm
  * @returns {number}
  */
-function rollMetersFromKg(kg, gsm, widthMm) {
-  if (!(gsm > 0) || !(widthMm > 0) || !(kg > 0)) return 0;
-  return (kg * 1_000_000) / (gsm * widthMm);
+function rollMetersFromKg(kg, gsm, openSizeMm) {
+  if (!(gsm > 0) || !(openSizeMm > 0) || !(kg > 0)) return 0;
+  return (kg * 1_000_000) / (gsm * openSizeMm);
 }
 
 /**
@@ -96,13 +96,12 @@ export function buildMaterialRequirementMap(orders) {
 
     const openSz = openSizeKey(o);
     const kgLine = lineKgRounded(o);
-    const widthMm = Number(o.widthMm);
     const companyName = String(o.companyName || '').trim();
     const jobName = String(o.jobName || '').trim();
 
     for (const mat of materials) {
       const gsm = gsmForMaterialLabel(mat);
-      const metersLine = rollMetersFromKg(kgLine, gsm, widthMm);
+      const metersLine = rollMetersFromKg(kgLine, gsm, openSz);
       const line = { kg: kgLine, meters: metersLine, companyName, jobName };
 
       if (!map[mat]) map[mat] = {};
