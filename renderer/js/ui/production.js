@@ -10,13 +10,16 @@ import {
   updateProductionDispatch,
   updateProductionOrder,
   deleteProductionOrder,
+  getCompanies,
+  printPreview,
 } from '../db.js';
-import { MATERIALS, POUCH_TYPES, PRODUCTION_SINGLE_SIDE_POUCH_TYPES } from '../data/materials.js';
+import { MATERIALS, POUCH_TYPES, PRODUCTION_SINGLE_SIDE_POUCH_TYPES, normalizePrintKind, normalizeInkCoverage, inkCoverageLabel } from '../data/materials.js';
 import { fmt, fmtDate, fmtDateOnly } from '../lib/formatter.js';
 import { showToast } from './toast.js';
 
 const els = {};
 let ordersCache = [];
+let companiesCache = [];
 let editingRowId = null;
 
 function byId(id) {
@@ -71,9 +74,17 @@ function buildUniqueJobsForCompany(companyName, orders) {
   )];
 }
 
+function companyDisplay(o) {
+  const name = o?.companyName || '';
+  if (o?.companyCode && name) return `${o.companyCode} · ${name}`;
+  return name || '-';
+}
+
 function renderCompanySuggestions() {
   if (!els.companyList) return;
-  const companies = buildUniqueCompanyList(ordersCache);
+  const fromOrders = buildUniqueCompanyList(ordersCache);
+  const fromMaster = companiesCache.map((c) => (c.name || '').trim()).filter(Boolean);
+  const companies = [...new Set([...fromMaster, ...fromOrders])];
   els.companyList.innerHTML = companies.map((name) => `<option value="${name}"></option>`).join('');
 }
 
@@ -118,6 +129,7 @@ function getFilteredProductionOrders() {
         o.orderDate,
         pouchTypeLabel(o.pouchType),
         printTypeLabel(o.printType),
+        inkCoverageLabel(o.inkCoverage),
       ];
       const hay = parts.filter(Boolean).join(' ').toLowerCase();
       return hay.includes(search);
@@ -187,7 +199,8 @@ function autofillFromLastOrder() {
   if (els.widthMm) els.widthMm.value = last.widthMm ?? '';
   if (els.heightMm) els.heightMm.value = last.heightMm ?? '';
   if (els.cylinderUpMm) els.cylinderUpMm.value = last.cylinderUpMm ?? '';
-  if (els.printType) els.printType.value = normalizeProductionPrintType(last.printType) || 'one_side';
+  if (els.printType) els.printType.value = normalizeProductionPrintType(last.printType) || 'printed';
+  if (els.inkCoverage) els.inkCoverage.value = normalizeInkCoverage(last.inkCoverage, last.printType);
   if (els.rate) els.rate.value = last.rate ?? '';
   if (els.quantityUnit) els.quantityUnit.value = last.quantityUnit || 'nos';
   syncProductionPouchFormUI();
@@ -221,16 +234,20 @@ function pouchTotalGsm(pouchType) {
 }
 
 function normalizeProductionPrintType(printType) {
-  const v = String(printType || '').toLowerCase();
-  if (v === 'two_side') return 'two_side';
-  if (v === 'printed') return 'one_side';
-  if (v === 'one_side' || v === 'plain') return v;
-  return '';
+  return normalizePrintKind(printType);
 }
 
 function productionPrintFactor(printType) {
-  const t = normalizeProductionPrintType(printType) || 'one_side';
-  return t === 'two_side' ? 2 : 1;
+  const t = String(printType || '').toLowerCase();
+  if (t === 'two_side') return 2;
+  return 1;
+}
+
+function printAndFaceLabel(row) {
+  const kind = normalizePrintKind(row?.printType);
+  if (kind === 'plain') return 'Plain';
+  if (kind === 'printed') return `Printed · ${inkCoverageLabel(row?.inkCoverage)}`;
+  return '-';
 }
 
 /** Same as calculateProduction: ((widthMm × cylinderUpMm) / 1000) × printFactor */
@@ -363,6 +380,7 @@ function readForm() {
     heightMm: single ? 0 : numberOrNull(els.heightMm?.value),
     cylinderUpMm: numberOrNull(els.cylinderUpMm?.value),
     printType: els.printType?.value || '',
+    inkCoverage: normalizeInkCoverage(els.inkCoverage?.value, els.printType?.value),
     rate: numberOrNull(els.rate?.value),
     quantity: numberOrNull(els.quantity?.value),
     quantityUnit: single ? 'kg' : (els.quantityUnit?.value || 'nos'),
@@ -401,6 +419,7 @@ function syncProductionPouchFormUI() {
   if (els.quantityUnitWrap) els.quantityUnitWrap.style.display = single ? 'none' : '';
   if (els.quantityKgOnlyWrap) els.quantityKgOnlyWrap.style.display = single ? '' : 'none';
   if (els.quantityUnit && single) els.quantityUnit.value = 'kg';
+  syncInkCoverageUI();
 }
 
 function fmtUnitQty(qty, unit) {
@@ -415,9 +434,15 @@ function fmtWhole(n) {
 function printTypeLabel(printType) {
   const v = normalizeProductionPrintType(printType);
   if (v === 'plain') return 'Plain';
-  if (v === 'one_side') return 'Single Side';
-  if (v === 'two_side') return 'Double Side';
+  if (v === 'printed') return 'Printed';
   return '-';
+}
+
+function syncInkCoverageUI() {
+  const plain = normalizePrintKind(els.printType?.value) === 'plain';
+  if (els.inkCoverage) els.inkCoverage.disabled = plain;
+  if (els.inkCoverageWrap) els.inkCoverageWrap.style.opacity = plain ? '0.55' : '';
+  if (plain && els.inkCoverage) els.inkCoverage.value = 'half';
 }
 
 function dispatchEntries(row) {
@@ -478,7 +503,7 @@ function renderDetailTable() {
   els.prodDetailTbody.innerHTML = visible.map((o) => `
     <tr>
       <td>${fmtDateOnly(o.orderDate)}</td>
-      <td>${escapeHtml(o.companyName || '-')}</td>
+      <td>${escapeHtml(companyDisplay(o))}</td>
       <td>${escapeHtml(o.jobName || '-')}</td>
       <td style="font-size:12px;max-width:220px;line-height:1.35">${pouchTypeDisplayHtml(o.pouchType)}</td>
       <td style="font-family:var(--mono)">${pouchSizeCellDisplay(o)}</td>
@@ -508,21 +533,7 @@ function filterSummaryLine({ statusValue, companyValue, pouchValue, searchValue 
 }
 
 function openProductionPrintFrame(title, subtitle, tableHtml) {
-  const frame = document.createElement('iframe');
-  frame.setAttribute('aria-hidden', 'true');
-  frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
-  document.body.appendChild(frame);
-
-  const doc = frame.contentDocument || frame.contentWindow?.document;
-  if (!doc || !frame.contentWindow) {
-    frame.remove();
-    showToast('warn', 'Unable to initialize print preview.');
-    return;
-  }
-
-  doc.open();
-  doc.write(`
-    <!doctype html>
+  const html = `<!doctype html>
     <html>
       <head>
         <meta charset="utf-8"/>
@@ -542,17 +553,13 @@ function openProductionPrintFrame(title, subtitle, tableHtml) {
         <p class="sub">${escapeHtml(subtitle)}</p>
         ${tableHtml}
       </body>
-    </html>
-  `);
-  doc.close();
+    </html>`;
 
-  const cleanup = () => {
-    setTimeout(() => frame.remove(), 300);
-  };
-  frame.contentWindow.addEventListener('afterprint', cleanup, { once: true });
-  frame.contentWindow.focus();
-  frame.contentWindow.print();
-  setTimeout(cleanup, 3000);
+  printPreview(html, title).then((res) => {
+    if (!res?.ok) showToast('warn', res?.error || 'Unable to open print preview.');
+  }).catch(() => {
+    showToast('warn', 'Unable to open print preview.');
+  });
 }
 
 function printOrdersTable() {
@@ -567,8 +574,8 @@ function printOrdersTable() {
       <td>${escapeHtml(fmtDateOnly(o.orderDate))}</td>
       <td>${escapeHtml(o.orderId || '-')}</td>
       <td>${escapeHtml((o.poNumber || '').trim() || '—')}</td>
-      <td>${escapeHtml(printTypeLabel(o.printType))}</td>
-      <td>${escapeHtml(o.companyName || '-')}</td>
+      <td>${escapeHtml(printAndFaceLabel(o))}</td>
+      <td>${escapeHtml(companyDisplay(o))}</td>
       <td>${escapeHtml(o.jobName || '-')}</td>
       <td>${escapeHtml(pouchTypeLabel(o.pouchType))}</td>
       <td>${escapeHtml(pouchSizeCellDisplay(o))}</td>
@@ -615,7 +622,7 @@ function printDetailTable() {
   const rows = visible.map((o) => `
     <tr>
       <td>${escapeHtml(fmtDateOnly(o.orderDate))}</td>
-      <td>${escapeHtml(o.companyName || '-')}</td>
+      <td>${escapeHtml(companyDisplay(o))}</td>
       <td>${escapeHtml(o.jobName || '-')}</td>
       <td>${escapeHtml(pouchTypeLabel(o.pouchType))}</td>
       <td>${escapeHtml(pouchSizeCellDisplay(o))}</td>
@@ -675,17 +682,20 @@ function renderOrdersTable() {
       </td>
       <td>
         ${editingRowId === o.id ? `
-        <select class="p-select prod-edit-print-type" data-prod-id="${o.id}" style="min-width:120px">
+        <select class="p-select prod-edit-print-type" data-prod-id="${o.id}" style="min-width:100px">
           <option value="plain" ${normalizeProductionPrintType(o.printType) === 'plain' ? 'selected' : ''}>Plain</option>
-          <option value="one_side" ${normalizeProductionPrintType(o.printType) === 'one_side' ? 'selected' : ''}>Single Side</option>
-          <option value="two_side" ${normalizeProductionPrintType(o.printType) === 'two_side' ? 'selected' : ''}>Double Side</option>
+          <option value="printed" ${normalizeProductionPrintType(o.printType) !== 'plain' ? 'selected' : ''}>Printed</option>
         </select>
-        ` : printTypeLabel(o.printType)}
+        <select class="p-select prod-edit-ink-coverage" data-prod-id="${o.id}" style="min-width:110px;margin-top:6px" ${normalizeProductionPrintType(o.printType) === 'plain' ? 'disabled' : ''}>
+          <option value="half" ${normalizeInkCoverage(o.inkCoverage, o.printType) !== 'full' ? 'selected' : ''}>Half face</option>
+          <option value="full" ${normalizeInkCoverage(o.inkCoverage, o.printType) === 'full' ? 'selected' : ''}>Full face</option>
+        </select>
+        ` : printAndFaceLabel(o)}
       </td>
       <td>
         ${editingRowId === o.id
           ? `<input class="p-input prod-edit-company" data-prod-id="${o.id}" type="text" value="${o.companyName || ''}" style="width:180px"/>`
-          : (o.companyName || '-')}
+          : companyDisplay(o)}
       </td>
       <td>
         ${editingRowId === o.id
@@ -786,9 +796,19 @@ function renderOrdersTable() {
     const id = sel.getAttribute('data-prod-id');
     const row = ordersCache.find((it) => String(it.id) === String(id));
     const span = els.ordersTbody.querySelector(`.prod-open-size-preview[data-prod-id="${id}"]`);
+    const inkSel = els.ordersTbody.querySelector(`.prod-edit-ink-coverage[data-prod-id="${id}"]`);
+    const toggleInk = () => {
+      const plain = normalizePrintKind(sel.value) === 'plain';
+      if (inkSel) {
+        inkSel.disabled = plain;
+        if (plain) inkSel.value = 'half';
+      }
+    };
+    sel.addEventListener('change', toggleInk);
+    toggleInk();
     if (!row || !span) return;
     const syncOpen = () => {
-      const pt = normalizeProductionPrintType(sel.value) || 'one_side';
+      const pt = normalizeProductionPrintType(sel.value) || 'printed';
       span.textContent = openSizeDisplay({ ...row, printType: pt });
     };
     sel.addEventListener('change', syncOpen);
@@ -818,7 +838,8 @@ function renderOrdersTable() {
 
       const orderDate = q('.prod-edit-order-date')?.value || row.orderDate;
       const poNumber = (q('.prod-edit-po-number')?.value || '').trim();
-      const printType = normalizeProductionPrintType(q('.prod-edit-print-type')?.value || row.printType || 'one_side');
+      const printType = normalizeProductionPrintType(q('.prod-edit-print-type')?.value || row.printType || 'printed') || 'printed';
+      const inkCoverage = normalizeInkCoverage(q('.prod-edit-ink-coverage')?.value || row.inkCoverage, printType);
       const pouchType = q('.prod-edit-pouch-type')?.value || row.pouchType || '';
       const companyName = (q('.prod-edit-company')?.value || row.companyName || '').trim();
       const jobName = (q('.prod-edit-job')?.value || row.jobName || '').trim();
@@ -834,6 +855,7 @@ function renderOrdersTable() {
       const calcIn = {
         pouchType,
         printType,
+        inkCoverage,
         quantity,
         quantityUnit,
         widthMm: numberOrNull(row.widthMm),
@@ -867,7 +889,7 @@ function renderOrdersTable() {
         ...row,
         pouchType,
         printType,
-        widthMm: row.widthMm,
+        inkCoverage,
         heightMm: isProductionSingleSidePouch(pouchType) ? 0 : row.heightMm,
         cylinderUpMm: row.cylinderUpMm,
       };
@@ -884,6 +906,7 @@ function renderOrdersTable() {
         orderDate,
         poNumber,
         printType,
+        inkCoverage,
         pouchType,
         companyName,
         jobName,
@@ -990,6 +1013,11 @@ function renderOrdersTable() {
 async function refreshOrders() {
   const all = await getProductionOrders();
   ordersCache = Array.isArray(all) ? all : [];
+  try {
+    companiesCache = await getCompanies();
+  } catch {
+    companiesCache = [];
+  }
   for (const row of ordersCache) {
     if (shouldAutoCompleteOrder(row)) {
       const completedAt = new Date().toISOString();
@@ -1015,7 +1043,8 @@ async function resetFormKeepContext() {
   if (els.widthMm) els.widthMm.value = '';
   if (els.heightMm) els.heightMm.value = '';
   if (els.cylinderUpMm) els.cylinderUpMm.value = '';
-  if (els.printType) els.printType.value = 'one_side';
+  if (els.printType) els.printType.value = 'printed';
+  if (els.inkCoverage) els.inkCoverage.value = 'half';
   if (els.rate) els.rate.value = '';
   if (els.quantity) els.quantity.value = '';
   if (els.quantityUnit) els.quantityUnit.value = 'nos';
@@ -1081,6 +1110,7 @@ function bindEvents() {
   });
   els.jobName?.addEventListener('change', autofillFromLastOrder);
   els.pouchType?.addEventListener('change', syncProductionPouchFormUI);
+  els.printType?.addEventListener('change', syncInkCoverageUI);
   byId('btn-prod-save-order')?.addEventListener('click', saveOrder);
   byId('btn-prod-clear-form')?.addEventListener('click', () => {
     resetFormKeepContext();
@@ -1122,6 +1152,8 @@ function cacheElements() {
   els.heightMm = byId('prod-height-mm');
   els.cylinderUpMm = byId('prod-cylinder-up-mm');
   els.printType = byId('prod-print-type');
+  els.inkCoverage = byId('prod-ink-coverage');
+  els.inkCoverageWrap = byId('prod-ink-coverage-wrap');
   els.rate = byId('prod-rate');
   els.quantity = byId('prod-quantity');
   els.quantityUnit = byId('prod-quantity-unit');

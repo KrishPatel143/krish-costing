@@ -5,12 +5,15 @@
  */
 
 import { initDb, getDbPath } from './db.js';
-import { initTabs, onTabActivate } from './ui/tabs.js';
+import { initTabs, onTabActivate, restoreActiveTab } from './ui/tabs.js';
 import { initPaperCalc } from './ui/paperCalc.js';
 import { initFoilCalc } from './ui/foilCalc.js';
 import { initRates, renderRatesTable } from './ui/rates.js';
 import { initHistory, renderHistory } from './ui/history.js';
 import { initProduction, renderProductionOrders } from './ui/production.js';
+import { initProducts, renderProducts } from './ui/products.js';
+import { initCompanies, renderCompanies } from './ui/companies.js';
+import { initQuotations, renderQuotations } from './ui/quotations.js';
 import { initMaterialRequirement, renderMaterialRequirement } from './ui/materialRequirement.js';
 
 async function boot() {
@@ -21,6 +24,9 @@ async function boot() {
   initTabs();
   onTabActivate('history', renderHistory);
   onTabActivate('production', renderProductionOrders);
+  onTabActivate('products', renderProducts);
+  onTabActivate('companies', renderCompanies);
+  onTabActivate('quotations', renderQuotations);
   onTabActivate('material-req', renderMaterialRequirement);
 
   // 3. Init each feature module (attaches event listeners)
@@ -30,9 +36,13 @@ async function boot() {
   initHistory();
   initMaterialRequirement();
   await initProduction();
+  await initProducts();
+  await initCompanies();
+  await initQuotations();
 
   // 4. Render static tables that need data at startup
   renderRatesTable();
+  restoreActiveTab();
 
   // 5. Show DB path in subtitle
   const dbPath = await getDbPath();

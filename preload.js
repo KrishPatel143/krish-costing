@@ -25,7 +25,28 @@ contextBridge.exposeInMainWorld('krish', {
   updateProductionOrder:    (id, entry)   => ipcRenderer.invoke('db:updateProductionOrder', { id, entry }),
   deleteProductionOrder:    (id)          => ipcRenderer.invoke('db:deleteProductionOrder', id),
 
+  // Products (catalog, separate from orders)
+  getProducts:                  ()          => ipcRenderer.invoke('db:getProducts'),
+  saveProduct:                  (entry)     => ipcRenderer.invoke('db:saveProduct', entry),
+  updateProduct:                (id, entry) => ipcRenderer.invoke('db:updateProduct', { id, entry }),
+  deleteProduct:                (id)        => ipcRenderer.invoke('db:deleteProduct', id),
+  importProductsFromProduction: ()          => ipcRenderer.invoke('db:importProductsFromProduction'),
+
+  getCompanies:  ()            => ipcRenderer.invoke('db:getCompanies'),
+  saveCompany:   (entry)       => ipcRenderer.invoke('db:saveCompany', entry),
+  updateCompany: (id, entry)   => ipcRenderer.invoke('db:updateCompany', { id, entry }),
+  deleteCompany: (id)          => ipcRenderer.invoke('db:deleteCompany', id),
+
+  getQuotations:       ()            => ipcRenderer.invoke('db:getQuotations'),
+  getNextQuotationId:  ()            => ipcRenderer.invoke('db:getNextQuotationId'),
+  getLastQuotedRates:  (companyId)   => ipcRenderer.invoke('db:getLastQuotedRates', companyId),
+  saveQuotation:       (entry)       => ipcRenderer.invoke('db:saveQuotation', entry),
+  updateQuotation:     (id, entry)   => ipcRenderer.invoke('db:updateQuotation', { id, entry }),
+  deleteQuotation:     (id)          => ipcRenderer.invoke('db:deleteQuotation', id),
+
   // App info
   getVersion:    ()      => ipcRenderer.invoke('app:getVersion'),
   getDbPath:     ()      => ipcRenderer.invoke('app:getDbPath'),
+
+  printPreview:  (html, title) => ipcRenderer.invoke('print:preview', { html, title }),
 });

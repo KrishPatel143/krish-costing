@@ -21,7 +21,7 @@ function readForm() {
     height:       parseFloat(document.getElementById('height').value),
     width:        parseFloat(document.getElementById('width').value),
     inkCoverage:  document.querySelector('input[name="ink"]:checked')?.value ?? 'half',
-    printType:    document.querySelector('input[name="print-type"]:checked')?.value ?? 'one_side',
+    printType:    document.querySelector('input[name="print-type"]:checked')?.value ?? 'printed',
     quantity:     parseInt(document.getElementById('quantity').value) || 1,
     profitPercent: Number.isFinite(profitRaw) && profitRaw >= 0 ? profitRaw : 30,
   };

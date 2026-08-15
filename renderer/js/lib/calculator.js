@@ -138,9 +138,10 @@ export function labourForFlex(height) {
  * Profit % is user-editable (default 30% of material cost).
  * @param {{ pouchTypeKey, height, width, inkCoverage, printType?, quantity, rates, profitPercent? }} p
  */
-export function calcPaperPouch({ pouchTypeKey, height, width, inkCoverage, printType = 'one_side', quantity, rates, profitPercent = 30 }) {
+export function calcPaperPouch({ pouchTypeKey, height, width, inkCoverage = 'half', printType = 'printed', quantity, rates, profitPercent = 30 }) {
   const pouchType = POUCH_TYPES[pouchTypeKey];
-  const inkKey = inkCoverage === 'half' ? 'ink_half' : 'ink_full';
+  const face = inkCoverage === 'full' ? 'full' : 'half';
+  const inkKey = face === 'half' ? 'ink_half' : 'ink_full';
   const areaSqM = (height * width) / 1_000_000;
   const { side1: s1Key, side2: s2Key } = pouchType;
 
@@ -166,7 +167,7 @@ export function calcPaperPouch({ pouchTypeKey, height, width, inkCoverage, print
   };
 
   return {
-    pouchType, s1Key, s2Key, inkKey, inkCoverage, printType,
+    pouchType, s1Key, s2Key, inkKey, inkCoverage: face, printType,
     height, width, quantity, areaSqM,
     s1, s2, ink, rates,
     profitPercent,

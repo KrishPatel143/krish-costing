@@ -128,11 +128,96 @@ export async function deleteProductionOrder(id) {
   return { ok: true };
 }
 
+// ─── Products catalog ─────────────────────────────────────────────────────────
+
+export async function getProducts() {
+  if (hasIPC()) return window.krish.getProducts();
+  return [];
+}
+
+export async function saveProduct(entry) {
+  if (hasIPC()) return window.krish.saveProduct(entry);
+  return { ok: true };
+}
+
+export async function updateProduct(id, entry) {
+  if (hasIPC()) return window.krish.updateProduct(id, entry);
+  return { ok: true };
+}
+
+export async function deleteProduct(id) {
+  if (hasIPC()) return window.krish.deleteProduct(id);
+  return { ok: true };
+}
+
+export async function importProductsFromProduction() {
+  if (hasIPC()) return window.krish.importProductsFromProduction();
+  return { ok: true, count: 0 };
+}
+
+export async function getCompanies() {
+  if (hasIPC()) return window.krish.getCompanies();
+  return [];
+}
+
+export async function saveCompany(entry) {
+  if (hasIPC()) return window.krish.saveCompany(entry);
+  return { ok: true };
+}
+
+export async function updateCompany(id, entry) {
+  if (hasIPC()) return window.krish.updateCompany(id, entry);
+  return { ok: true };
+}
+
+export async function deleteCompany(id) {
+  if (hasIPC()) return window.krish.deleteCompany(id);
+  return { ok: true };
+}
+
+export async function getQuotations() {
+  if (hasIPC()) return window.krish.getQuotations();
+  return [];
+}
+
+export async function getNextQuotationId() {
+  if (hasIPC()) return window.krish.getNextQuotationId();
+  const year = new Date().getFullYear();
+  return `QT-${year}-0001`;
+}
+
+export async function getLastQuotedRates(companyId) {
+  if (hasIPC()) return window.krish.getLastQuotedRates(companyId);
+  return {};
+}
+
+export async function saveQuotation(entry) {
+  if (hasIPC()) return window.krish.saveQuotation(entry);
+  return { ok: true };
+}
+
+export async function updateQuotation(id, entry) {
+  if (hasIPC()) return window.krish.updateQuotation(id, entry);
+  return { ok: true };
+}
+
+export async function deleteQuotation(id) {
+  if (hasIPC()) return window.krish.deleteQuotation(id);
+  return { ok: true };
+}
+
 // ─── App meta ─────────────────────────────────────────────────────────────────
 
 export async function getDbPath() {
   if (hasIPC()) return window.krish.getDbPath();
   return null;
+}
+
+export async function printPreview(html, title) {
+  if (!hasIPC() || typeof window.krish.printPreview !== 'function') {
+    return { ok: false, error: 'Print preview is only available in the desktop app.' };
+  }
+  return window.krish.printPreview(html, title);
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────

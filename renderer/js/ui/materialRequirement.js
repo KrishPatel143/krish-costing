@@ -4,7 +4,7 @@
  * group by material and open size, sum KG and roll meters with per-line breakdown (company, job).
  */
 
-import { getProductionOrders } from '../db.js';
+import { getProductionOrders, printPreview } from '../db.js';
 import { MATERIALS } from '../data/materials.js';
 import {
   calculateProduction,
@@ -260,21 +260,7 @@ function printMaterialRequirement() {
     </tr>
   `).join('');
 
-  const frame = document.createElement('iframe');
-  frame.setAttribute('aria-hidden', 'true');
-  frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
-  document.body.appendChild(frame);
-
-  const doc = frame.contentDocument || frame.contentWindow?.document;
-  if (!doc || !frame.contentWindow) {
-    frame.remove();
-    showToast('info', 'Unable to initialize print preview.');
-    return;
-  }
-
-  doc.open();
-  doc.write(`
-    <!doctype html>
+  const html = `<!doctype html>
     <html>
       <head>
         <meta charset="utf-8"/>
@@ -303,17 +289,13 @@ function printMaterialRequirement() {
           <tbody>${bodyRows}</tbody>
         </table>
       </body>
-    </html>
-  `);
-  doc.close();
+    </html>`;
 
-  const cleanup = () => {
-    setTimeout(() => frame.remove(), 300);
-  };
-  frame.contentWindow.addEventListener('afterprint', cleanup, { once: true });
-  frame.contentWindow.focus();
-  frame.contentWindow.print();
-  setTimeout(cleanup, 3000);
+  printPreview(html, 'Material Requirement').then((res) => {
+    if (!res?.ok) showToast('info', res?.error || 'Unable to open print preview.');
+  }).catch(() => {
+    showToast('info', 'Unable to open print preview.');
+  });
 }
 
 function exportMaterialRequirement() {

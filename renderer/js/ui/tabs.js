@@ -22,9 +22,20 @@ export function onTabActivate(tabId, fn) {
  */
 export function switchTab(tabId, btn) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-  document.querySelectorAll('.p-tab').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.p-tab').forEach(el => {
+    el.classList.remove('active');
+    el.removeAttribute('aria-current');
+  });
   document.getElementById(`tab-${tabId}`)?.classList.add('active');
   btn.classList.add('active');
+  btn.setAttribute('aria-current', 'page');
+
+  const title = document.getElementById('page-title');
+  const subtitle = document.getElementById('page-subtitle');
+  if (title) title.textContent = btn.dataset.title || btn.textContent.trim();
+  if (subtitle) subtitle.textContent = btn.dataset.subtitle || '';
+
+  try { localStorage.setItem('krish-active-tab', tabId); } catch { /* ignore quota */ }
 
   const hook = tabActivationHooks.get(tabId);
   if (hook) hook();
@@ -48,4 +59,13 @@ export function initTabs() {
   document.querySelectorAll('[data-tab]').forEach(btn => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab, btn));
   });
+}
+
+/** Restore last section after activation hooks are registered. */
+export function restoreActiveTab() {
+  try {
+    const saved = localStorage.getItem('krish-active-tab');
+    const btn = saved ? document.querySelector(`[data-tab="${saved}"]`) : null;
+    if (btn) switchTab(saved, btn);
+  } catch { /* ignore */ }
 }

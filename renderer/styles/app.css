@@ -66,10 +66,8 @@ body{font-family:var(--sans);background:var(--color-background-secondary);color:
 .p-toast.danger{background:#FCEBEB;color:#791F1F;border-color:#E24B4A}
 .p-toast.info{background:#E6F1FB;color:#0C447C;border-color:#378ADD}
 
-/* Tabs */
-.p-tab-bar{display:flex;gap:0;border-bottom:0.5px solid var(--card-border);width:100%}
-.p-tab{font-size:13px;padding:8px 16px;border:none;background:none;color:var(--color-text-secondary);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-0.5px;font-family:var(--sans)}
-.p-tab.active{color:#185FA5;border-bottom-color:#185FA5;font-weight:500}
+/* Legacy tab class — used by sidebar items */
+.p-tab{font-family:var(--sans);cursor:pointer}
 
 /* Table */
 .p-table{width:100%;border-collapse:collapse;font-size:13px}
@@ -84,14 +82,85 @@ body{font-family:var(--sans);background:var(--color-background-secondary);color:
 .p-alert.warn{background:#FAEEDA;color:#633806;border:0.5px solid #FAC775}
 .p-alert.success{background:#EAF3DE;color:#27500A;border:0.5px solid #C0DD97}
 
-/* ── App-specific ── */
-html,body{height:100%}
+/* ── App chrome ── */
+html,body{height:100%;overflow:hidden}
 body{padding:0}
-.app-shell{max-width:none;width:100%;margin:0 auto;padding:16px 24px 32px}
-.app-header{margin-bottom:24px}
-.app-header h1{font-size:20px;font-weight:600;color:var(--color-text-primary)}
-.app-header p{font-size:13px;color:var(--color-text-tertiary);margin-top:4px}
-
+.app-shell{
+  display:flex;
+  height:100%;
+  width:100%;
+  margin:0;
+  padding:0;
+  background:var(--color-background-secondary);
+}
+.app-nav{
+  width:228px;
+  flex-shrink:0;
+  display:flex;
+  flex-direction:column;
+  background:#eceae3;
+  border-right:0.5px solid var(--color-border-primary);
+  padding:18px 12px 14px;
+}
+.app-nav-brand{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:2px 8px 18px;
+}
+.app-nav-mark{
+  width:32px;height:32px;border-radius:8px;
+  background:#1a1917;color:#f5f5f3;
+  display:flex;align-items:center;justify-content:center;
+  font-size:15px;font-weight:600;letter-spacing:-.03em;
+}
+.app-nav-name{font-size:14px;font-weight:600;color:var(--color-text-primary);line-height:1.2}
+.app-nav-tag{font-size:11px;color:var(--color-text-tertiary);margin-top:2px}
+.app-nav-list{display:flex;flex-direction:column;gap:2px;flex:1;overflow:auto}
+.app-nav-group{
+  font-size:10px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--color-text-tertiary);
+  padding:14px 10px 6px;
+}
+.app-nav-group:first-child{padding-top:0}
+.app-nav-item{
+  display:flex;align-items:center;gap:10px;
+  width:100%;text-align:left;
+  border:none;background:transparent;
+  color:var(--color-text-secondary);
+  font-size:13px;font-weight:500;
+  padding:8px 10px;border-radius:8px;
+  transition:background .12s,color .12s;
+}
+.app-nav-item:hover{background:rgba(26,25,23,.05);color:var(--color-text-primary)}
+.app-nav-item:active{transform:scale(.98)}
+.app-nav-item.active{
+  background:#fff;
+  color:#0C447C;
+  box-shadow:inset 3px 0 0 #185FA5;
+}
+.app-nav-icon{width:16px;height:16px;flex-shrink:0}
+.app-nav-foot{
+  margin-top:12px;padding:10px 10px 2px;
+  border-top:0.5px solid var(--color-border-tertiary);
+  display:flex;flex-direction:column;gap:3px;min-width:0;
+}
+.app-nav-foot-label{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-text-tertiary)}
+.app-nav-foot-path{
+  font-family:var(--mono);font-size:10px;color:var(--color-text-secondary);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.app-stage{
+  flex:1;min-width:0;display:flex;flex-direction:column;
+  padding:18px 22px 22px;
+}
+.app-stage-head{margin-bottom:14px}
+.app-stage-head h1{font-size:20px;font-weight:600;color:var(--color-text-primary);letter-spacing:-.02em}
+.app-stage-head p{font-size:13px;color:var(--color-text-tertiary);margin-top:3px}
+.app-stage-card{
+  flex:1;min-height:0;overflow:auto;
+  gap:0;padding:0;
+}
 .tab-content{display:none}
 .tab-content.active{display:block}
 
@@ -163,11 +232,35 @@ body{padding:0}
 .rates-section-title{font-size:13px;font-weight:600;color:var(--color-text-primary)}
 .rates-section-sub{font-size:11px;color:var(--color-text-tertiary);margin-top:2px}
 
-/* Responsive */
+.company-layout{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:22px;align-items:start}
+.company-card{
+  background:var(--tag-bg);
+  border:0.5px solid var(--card-border);
+  border-radius:12px;
+  padding:16px 16px 18px;
+  min-height:220px;
+}
+.company-card-code{font-family:var(--mono);font-size:11px;color:var(--color-text-tertiary);letter-spacing:.04em}
+.company-card-name{font-size:18px;font-weight:600;margin:6px 0 10px;line-height:1.25}
+.company-card-line{font-size:13px;color:var(--color-text-secondary);margin-bottom:4px}
+.company-card-muted{font-size:12px;color:var(--color-text-tertiary);margin-bottom:4px}
+.company-card-block{margin-top:12px;font-size:13px;line-height:1.45}
+.company-card-k{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-text-tertiary);margin-bottom:3px}
+.multi-row{display:flex;align-items:flex-start;gap:8px;margin-top:6px}
+
+@media(max-width:900px){
+  .app-nav{width:72px;padding:14px 8px}
+  .app-nav-brand>div:last-child,
+  .app-nav-item{font-size:0;gap:0;justify-content:center;padding:10px}
+  .app-nav-group,.app-nav-foot,.app-nav-tag,.app-nav-name{display:none}
+  .app-nav-item.active{box-shadow:none;background:#fff}
+  .app-stage{padding:14px 14px 16px}
+}
 @media(max-width:640px){
-  .app-shell{padding:12px 12px 24px}
+  .app-shell{padding:0}
   .result-highlight{grid-template-columns:1fr}
   .form-row{grid-template-columns:1fr}
   .summary-header span,.sr-values span{min-width:64px}
   .layer-row{grid-template-columns:1fr 1fr;grid-template-rows:auto auto}
+  .company-layout{grid-template-columns:1fr}
 }

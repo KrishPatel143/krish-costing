@@ -15,12 +15,42 @@ export const MATERIALS = {
   ink_full: { label: 'Ink — Full Coverage', gsm: 2 },
 };
 
-/** @type {Record<string, number>} */
+/** Printed vs unprinted. Legacy one_side / two_side map to printed. */
+export const PRINT_KINDS = {
+  plain: 'plain',
+  printed: 'printed',
+};
+
+/** Ink face coverage for printed paper pouches. Default is half. */
+export const INK_COVERAGE = {
+  half: 'half',
+  full: 'full',
+};
+
+/** Multiplier on ink GSM. Face (half/full) is separate via inkCoverage. */
 export const PRINT_TYPES = {
   plain: 0,
+  printed: 1,
   one_side: 1,
-  two_side: 2,
+  two_side: 1,
 };
+
+export function normalizePrintKind(printType) {
+  const v = String(printType || '').toLowerCase();
+  if (v === 'plain') return 'plain';
+  if (v === 'printed' || v === 'one_side' || v === 'two_side') return 'printed';
+  return '';
+}
+
+/** Default half face. Plain pouches still store half but costing uses 0 ink. */
+export function normalizeInkCoverage(coverage, printType) {
+  if (normalizePrintKind(printType) === 'plain') return 'half';
+  return String(coverage || '').toLowerCase() === 'full' ? 'full' : 'half';
+}
+
+export function inkCoverageLabel(coverage) {
+  return normalizeInkCoverage(coverage) === 'full' ? 'Full face' : 'Half face';
+}
 
 /** @type {Record<string, number>} */
 export const DEFAULT_RATES = {
