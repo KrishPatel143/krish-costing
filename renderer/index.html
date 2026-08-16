@@ -321,54 +321,51 @@
     </div>
 
     <!-- ══ TAB: PRODUCTION ══ -->
-    <div id="tab-production" class="tab-content" style="padding:22px">
-      <div class="card" style="padding:16px;gap:16px">
-        <div class="btn-group" id="production-page-toggle">
-          <button type="button" data-page="new-order">New Order</button>
-          <button type="button" class="active" data-page="orders-table">Detail View</button>
-          <button type="button" data-page="detail-view">Orders Table</button>
+    <div id="tab-production" class="tab-content prod-tab">
+      <div class="card prod-shell">
+        <div class="prod-toolbar">
+          <div class="btn-group" id="production-page-toggle">
+            <button type="button" data-page="new-order">New Order</button>
+            <button type="button" class="active" data-page="orders-table">Detail View</button>
+            <button type="button" data-page="detail-view">Orders Table</button>
+          </div>
         </div>
 
-        <div id="production-page-new-order" style="display:none">
-          <div class="form-row">
+        <div id="production-page-new-order" class="prod-order" style="display:none">
+          <div class="prod-order-grid">
             <div class="field-group">
-              <label class="p-label" for="prod-order-date">Order Date</label>
+              <label class="p-label" for="prod-order-date">Date</label>
               <input class="p-input" id="prod-order-date" type="date"/>
             </div>
             <div class="field-group">
               <label class="p-label" for="prod-order-id">Order ID</label>
-              <input class="p-input" id="prod-order-id" type="text" readonly/>
+              <input class="p-input prod-order-id-input" id="prod-order-id" type="text" readonly tabindex="-1"/>
             </div>
             <div class="field-group">
-              <label class="p-label" for="prod-po-number">PO Number (Optional)</label>
-              <input class="p-input" id="prod-po-number" type="text" placeholder="PO-001"/>
+              <label class="p-label" for="prod-po-number">PO</label>
+              <input class="p-input" id="prod-po-number" type="text" placeholder="PO" autocomplete="off"/>
             </div>
-          </div>
-
-          <div class="divider"></div>
-
-          <div class="form-row">
-            <div class="field-group">
-            <label class="p-label" for="prod-company-name">Company Name</label>
-            <input class="p-input" id="prod-company-name" type="text" list="prod-company-list" placeholder="Type or pick a company" style="min-width:320px"/>
+            <div class="field-group prod-span-2">
+              <label class="p-label" for="prod-company-name">Company</label>
+              <input class="p-input" id="prod-company-name" type="text" list="prod-company-list" placeholder="Company" autocomplete="off"/>
               <datalist id="prod-company-list"></datalist>
             </div>
-            <div class="field-group">
-              <label class="p-label" for="prod-job-name">Job Name</label>
-              <input class="p-input" id="prod-job-name" type="text" list="prod-job-list" placeholder="Type product/job name" style="min-width:320px"/>
+            <div class="field-group prod-span-2">
+              <label class="p-label" for="prod-job-name">Job</label>
+              <input class="p-input" id="prod-job-name" type="text" list="prod-job-list" placeholder="Job" autocomplete="off"/>
               <datalist id="prod-job-list"></datalist>
             </div>
-            <div class="field-group">
+            <div class="field-group prod-span-3">
               <label class="p-label" for="prod-pouch-type">Pouch Type</label>
               <select class="p-select" id="prod-pouch-type">
-                <option value="">Select type</option>
-                <optgroup label="Single web (kg only)">
+                <option value="">Select</option>
+                <optgroup label="Single web">
                   <option value="prod_medical_paper">Medical Paper</option>
                   <option value="prod_cromo">Cromo</option>
                   <option value="prod_4ply">4 Ply</option>
                   <option value="prod_poster">Poster</option>
                 </optgroup>
-                <optgroup label="Laminate pouch (width × height)">
+                <optgroup label="Laminate">
                   <option value="med_ost">Medical Paper + One Side Transparent</option>
                   <option value="cromo_ost">Cromo + One Side Transparent</option>
                   <option value="cromo_cromo">Cromo + Cromo</option>
@@ -377,30 +374,8 @@
                 </optgroup>
               </select>
             </div>
-          </div>
-
-          <div class="divider"></div>
-
-          <div class="form-row">
             <div class="field-group">
-              <label class="p-label" for="prod-width-mm">Pouch Width (mm)</label>
-              <input class="p-input" id="prod-width-mm" type="number" min="1" step="0.01"/>
-            </div>
-            <div class="field-group" id="prod-height-field-group">
-              <label class="p-label" for="prod-height-mm">Pouch Height (mm)</label>
-              <input class="p-input" id="prod-height-mm" type="number" min="0" step="0.01" value=""/>
-            </div>
-            <div class="field-group">
-              <label class="p-label" for="prod-cylinder-up-mm">Cylinder Up (mm)</label>
-              <input class="p-input" id="prod-cylinder-up-mm" type="number" min="1" step="0.01"/>
-            </div>
-          </div>
-
-          <div class="divider"></div>
-
-          <div class="form-row">
-            <div class="field-group">
-              <label class="p-label" for="prod-print-type">Print Type</label>
+              <label class="p-label" for="prod-print-type">Print</label>
               <select class="p-select" id="prod-print-type">
                 <option value="">Select</option>
                 <option value="plain">Plain</option>
@@ -408,38 +383,49 @@
               </select>
             </div>
             <div class="field-group" id="prod-ink-coverage-wrap">
-              <label class="p-label" for="prod-ink-coverage">Print face</label>
+              <label class="p-label" for="prod-ink-coverage">Face</label>
               <select class="p-select" id="prod-ink-coverage">
-                <option value="half" selected>Half face</option>
-                <option value="full">Full face</option>
+                <option value="half" selected>Half</option>
+                <option value="full">Full</option>
               </select>
             </div>
             <div class="field-group">
-              <label class="p-label" for="prod-rate">Rate</label>
+              <label class="p-label" for="prod-width-mm">Width mm</label>
+              <input class="p-input" id="prod-width-mm" type="number" min="1" step="0.01"/>
+            </div>
+            <div class="field-group" id="prod-height-field-group">
+              <label class="p-label" for="prod-height-mm">Height mm</label>
+              <input class="p-input" id="prod-height-mm" type="number" min="0" step="0.01" value=""/>
+            </div>
+            <div class="field-group">
+              <label class="p-label" for="prod-cylinder-up-mm">Cyl. Up mm</label>
+              <input class="p-input" id="prod-cylinder-up-mm" type="number" min="1" step="0.01"/>
+            </div>
+            <div class="field-group">
+              <label class="p-label" for="prod-rate">Rate ₹</label>
               <input class="p-input" id="prod-rate" type="number" min="0" step="0.01"/>
             </div>
             <div class="field-group">
-              <label class="p-label" for="prod-quantity">Quantity</label>
+              <label class="p-label" for="prod-quantity">Qty</label>
               <input class="p-input" id="prod-quantity" type="number" min="0.001" step="0.001"/>
             </div>
             <div class="field-group" id="prod-quantity-unit-wrap">
-              <label class="p-label" for="prod-quantity-unit">Quantity Unit</label>
+              <label class="p-label" for="prod-quantity-unit">Unit</label>
               <select class="p-select" id="prod-quantity-unit">
                 <option value="nos">NOS</option>
                 <option value="kg">KG</option>
               </select>
             </div>
             <div class="field-group" id="prod-quantity-kg-only-wrap" style="display:none">
-              <label class="p-label">Quantity Unit</label>
-              <div class="p-input" style="display:flex;align-items:center;background:var(--color-bg-secondary);color:var(--color-text-secondary)">KG only</div>
+              <label class="p-label">Unit</label>
+              <div class="prod-locked-field">KG</div>
+            </div>
+            <div class="prod-order-actions">
+              <button class="p-btn" id="btn-prod-clear-form" type="button">Clear</button>
+              <button class="p-btn p-btn-primary" id="btn-prod-save-order" type="button">Save</button>
             </div>
           </div>
-
-          <div style="display:flex;gap:10px;align-items:center;margin-top:10px">
-            <button class="p-btn p-btn-primary" id="btn-prod-save-order" type="button">Save Order</button>
-            <button class="p-btn" id="btn-prod-clear-form" type="button">Clear</button>
-          </div>
-          <div id="prod-form-error" style="display:none;margin-top:12px">
+          <div id="prod-form-error" class="prod-order-error" style="display:none">
             <div class="p-alert warn">
               <span>⚠</span><span id="prod-form-error-msg">Please fill required fields.</span>
             </div>
@@ -585,10 +571,6 @@
         <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap">
           <div>
             <div class="section-label" style="margin-bottom:4px">Product catalog</div>
-            <p style="margin:0;font-size:13px;color:var(--color-text-secondary);max-width:640px">
-              Each product gets a code like <span style="font-family:var(--mono)">C-0001-P-0003</span>.
-              Cost uses current material rates, the product print face (default half), and 30% profit. Laminate jobs show cost per pouch; single web jobs show cost per kg. Plain pouches skip ink.
-            </p>
           </div>
           <button type="button" class="p-btn p-btn-primary" id="btn-product-import">Import from production</button>
         </div>

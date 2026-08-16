@@ -264,3 +264,57 @@ body{padding:0}
   .layer-row{grid-template-columns:1fr 1fr;grid-template-rows:auto auto}
   .company-layout{grid-template-columns:1fr}
 }
+
+/* ── Production: New Order ── */
+.prod-tab{padding:16px 18px 18px}
+.prod-shell{padding:14px 14px 16px;gap:14px}
+.prod-toolbar{display:flex;align-items:center;gap:12px}
+
+.prod-order-grid{
+  display:grid;
+  grid-template-columns:repeat(7,minmax(0,1fr));
+  gap:10px 12px;
+  align-items:end;
+}
+.prod-span-2{grid-column:span 2}
+.prod-span-3{grid-column:span 3}
+.prod-order .p-input,
+.prod-order .p-select{width:100%;min-width:0}
+.prod-order .p-label{margin-bottom:0;font-size:11px}
+.prod-order .field-group{gap:4px}
+.prod-order-id-input{
+  font-family:var(--mono);
+  letter-spacing:.03em;
+  color:var(--color-text-secondary);
+  cursor:default;
+}
+.prod-locked-field{
+  display:flex;
+  align-items:center;
+  min-height:36px;
+  padding:8px 12px;
+  border-radius:6px;
+  border:0.5px solid var(--card-border);
+  background:var(--color-background-secondary);
+  font-family:var(--mono);
+  font-size:13px;
+}
+.prod-order-error{margin-top:10px}
+.prod-order-actions{
+  grid-column:span 3;
+  display:flex;
+  justify-content:flex-end;
+  align-items:end;
+  gap:8px;
+  padding-bottom:1px;
+}
+.prod-order-actions .p-btn-primary{min-width:112px}
+
+@media(max-width:980px){
+  .prod-order-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .prod-span-2,.prod-span-3,.prod-order-actions{grid-column:span 2}
+}
+@media(max-width:640px){
+  .prod-order-grid{grid-template-columns:1fr 1fr}
+  .prod-span-2,.prod-span-3,.prod-order-actions{grid-column:1 / -1}
+}

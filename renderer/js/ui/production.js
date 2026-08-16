@@ -11,15 +11,21 @@ import {
   updateProductionOrder,
   deleteProductionOrder,
   getCompanies,
+  getProducts,
+  getQuotations,
+  getRatesSync,
   printPreview,
 } from '../db.js';
-import { MATERIALS, POUCH_TYPES, PRODUCTION_SINGLE_SIDE_POUCH_TYPES, normalizePrintKind, normalizeInkCoverage, inkCoverageLabel } from '../data/materials.js';
+import { MATERIALS, POUCH_TYPES, PRODUCTION_SINGLE_SIDE_POUCH_TYPES, DEFAULT_RATES, normalizePrintKind, normalizeInkCoverage, inkCoverageLabel } from '../data/materials.js';
+import { calcPaperPouch, calcMaterial, labourForPaper } from '../lib/calculator.js';
 import { fmt, fmtDate, fmtDateOnly } from '../lib/formatter.js';
 import { showToast } from './toast.js';
 
 const els = {};
 let ordersCache = [];
 let companiesCache = [];
+let productsCache = [];
+let quotationsCache = [];
 let editingRowId = null;
 
 function byId(id) {
@@ -66,12 +72,14 @@ function buildUniqueCompanyList(orders) {
 
 function buildUniqueJobsForCompany(companyName, orders) {
   const needle = (companyName || '').trim().toLowerCase();
-  return [...new Set(
-    orders
-      .filter((o) => (o.companyName || '').trim().toLowerCase() === needle)
-      .map((o) => (o.jobName || '').trim())
-      .filter(Boolean)
-  )];
+  const fromProducts = productsForCompanyName(companyName)
+    .map((p) => (p.jobName || '').trim())
+    .filter(Boolean);
+  const fromOrders = (orders || [])
+    .filter((o) => (o.companyName || '').trim().toLowerCase() === needle)
+    .map((o) => (o.jobName || '').trim())
+    .filter(Boolean);
+  return [...new Set([...fromProducts, ...fromOrders])];
 }
 
 function companyDisplay(o) {
@@ -182,6 +190,22 @@ function renderJobSuggestions(companyName) {
   els.jobList.innerHTML = jobs.map((name) => `<option value="${name}"></option>`).join('');
 }
 
+function companyByName(name) {
+  const n = (name || '').trim().toLowerCase();
+  if (!n) return null;
+  return companiesCache.find((c) => (c.name || '').trim().toLowerCase() === n) || null;
+}
+
+function productsForCompanyName(companyName) {
+  const company = companyByName(companyName);
+  const n = (companyName || '').trim().toLowerCase();
+  if (!n && !company) return [];
+  return productsCache.filter((p) => {
+    if (company && p.companyId != null && String(p.companyId) === String(company.id)) return true;
+    return (p.companyName || '').trim().toLowerCase() === n;
+  });
+}
+
 function latestOrderByCompanyAndJob(companyName, jobName) {
   const c = (companyName || '').trim().toLowerCase();
   const j = (jobName || '').trim().toLowerCase();
@@ -192,17 +216,165 @@ function latestOrderByCompanyAndJob(companyName, jobName) {
   ) || null;
 }
 
-function autofillFromLastOrder() {
-  const last = latestOrderByCompanyAndJob(els.companyName?.value, els.jobName?.value);
-  if (!last) return;
-  if (els.pouchType) els.pouchType.value = last.pouchType || '';
-  if (els.widthMm) els.widthMm.value = last.widthMm ?? '';
-  if (els.heightMm) els.heightMm.value = last.heightMm ?? '';
-  if (els.cylinderUpMm) els.cylinderUpMm.value = last.cylinderUpMm ?? '';
-  if (els.printType) els.printType.value = normalizeProductionPrintType(last.printType) || 'printed';
-  if (els.inkCoverage) els.inkCoverage.value = normalizeInkCoverage(last.inkCoverage, last.printType);
-  if (els.rate) els.rate.value = last.rate ?? '';
-  if (els.quantityUnit) els.quantityUnit.value = last.quantityUnit || 'nos';
+function pickProductForAutofill(companyName, jobName) {
+  const j = (jobName || '').trim().toLowerCase();
+  if (!j) return null;
+  const matches = productsForCompanyName(companyName)
+    .filter((p) => (p.jobName || '').trim().toLowerCase() === j);
+  if (!matches.length) return null;
+  if (matches.length === 1) return matches[0];
+
+  const pouch = (els.pouchType?.value || '').trim();
+  const width = numberOrNull(els.widthMm?.value);
+  let pool = matches;
+  if (pouch) {
+    const byPouch = pool.filter((p) => String(p.pouchType || '') === pouch);
+    if (byPouch.length) pool = byPouch;
+  }
+  if (Number.isFinite(width) && width > 0) {
+    const byWidth = pool.filter((p) => Number(p.widthMm) === width);
+    if (byWidth.length) pool = byWidth;
+  }
+  return pool.slice().sort((a, b) =>
+    String(b.lastOrderDate || '').localeCompare(String(a.lastOrderDate || ''))
+  )[0] || pool[0];
+}
+
+function applySpecToForm(spec) {
+  if (!spec) return;
+  if (els.pouchType) els.pouchType.value = spec.pouchType || '';
+  if (els.widthMm) els.widthMm.value = spec.widthMm ?? '';
+  if (els.heightMm) els.heightMm.value = isProductionSingleSidePouch(spec.pouchType) ? '' : (spec.heightMm ?? '');
+  if (els.cylinderUpMm) els.cylinderUpMm.value = spec.cylinderUpMm ?? '';
+  if (els.printType) els.printType.value = normalizeProductionPrintType(spec.printType) || 'printed';
+  if (els.inkCoverage) els.inkCoverage.value = normalizeInkCoverage(spec.inkCoverage, spec.printType);
+}
+
+function roundRate(n) {
+  const v = Number(n);
+  return Number.isFinite(v) ? Math.round(v * 100) / 100 : 0;
+}
+
+function dimMm(p, ...keys) {
+  for (const k of keys) {
+    const n = Number(p?.[k]);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return 0;
+}
+
+function defaultQtyUnit(pouchType) {
+  return isProductionSingleSidePouch(pouchType) ? 'kg' : 'nos';
+}
+
+function specMatchKeys(p) {
+  const job = String(p?.jobName || '').trim().toLowerCase();
+  const pouch = String(p?.pouchType || '').trim();
+  const width = roundRate(dimMm(p, 'widthMm', 'width'));
+  const height = roundRate(dimMm(p, 'heightMm', 'height'));
+  const cylinder = roundRate(dimMm(p, 'cylinderUpMm', 'cylinderUp'));
+  const print = normalizeProductionPrintType(p?.printType) || 'printed';
+  const ink = normalizeInkCoverage(p?.inkCoverage, print);
+  return [
+    [job, pouch, width, height, cylinder, print, ink].join('|'),
+    [job, pouch, width, height, print, ink].join('|'),
+    [job, pouch, width, height].join('|'),
+    [job, pouch, width].join('|'),
+  ];
+}
+
+function lastQuotedForSpec(spec, company) {
+  if (!spec || !company) return null;
+  const cid = String(company.id);
+  const specKeys = specMatchKeys(spec);
+  const list = quotationsCache
+    .filter((q) => String(q.companyId) === cid)
+    .slice()
+    .sort((a, b) => String(a.quotationDate || a.createdAt || '').localeCompare(String(b.quotationDate || b.createdAt || '')));
+  let found = null;
+  for (const q of list) {
+    for (const line of q.lines || []) {
+      const sameId = spec.id != null && line.productId != null && String(line.productId) === String(spec.id);
+      const sameCode = spec.productCode && line.productCode && String(line.productCode) === String(spec.productCode);
+      const sameKey = specMatchKeys(line).some((k) => specKeys.includes(k));
+      const rate = Number(line.quotedRate);
+      if ((sameId || sameCode || sameKey) && Number.isFinite(rate) && rate > 0) {
+        const unit = String(line.rateUnit || '').toLowerCase() === 'kg' ? 'kg' : 'nos';
+        found = { rate: roundRate(rate), unit };
+      }
+    }
+  }
+  return found;
+}
+
+function calculatedPaperRate(spec, unit) {
+  const rates = Object.assign({}, DEFAULT_RATES, getRatesSync() || {});
+  const width = dimMm(spec, 'widthMm', 'width');
+  const heightLam = dimMm(spec, 'heightMm', 'height');
+  const height = heightLam || (isProductionSingleSidePouch(spec.pouchType) ? dimMm(spec, 'cylinderUpMm', 'cylinderUp') : 0);
+  const printType = normalizeProductionPrintType(spec.printType) || 'printed';
+  const face = normalizeInkCoverage(spec.inkCoverage, printType);
+  const wantKg = unit === 'kg';
+
+  if (POUCH_TYPES[spec.pouchType]) {
+    if (width <= 0 || height <= 0) return 0;
+    try {
+      const result = calcPaperPouch({
+        pouchTypeKey: spec.pouchType,
+        height,
+        width,
+        inkCoverage: face,
+        printType,
+        quantity: 1,
+        rates,
+        profitPercent: 30,
+      });
+      const perPouch = Number(result.finalPerPouch) || 0;
+      if (!wantKg) return roundRate(perPouch);
+      const kgPerPouch = (Number(result.s1?.wastageKg) || 0)
+        + (Number(result.s2?.wastageKg) || 0)
+        + (Number(result.ink?.wastageKg) || 0);
+      return kgPerPouch > 0 ? roundRate(perPouch / kgPerPouch) : 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  const single = PRODUCTION_SINGLE_SIDE_POUCH_TYPES[spec.pouchType];
+  if (!single) return 0;
+  const gsm = MATERIALS[single.gsmKey]?.gsm || 0;
+  const ratePerKg = Number(rates[single.gsmKey]) || 0;
+  if (gsm <= 0 || ratePerKg <= 0) return 0;
+  const perKg = ratePerKg * 1.03 * 1.3;
+  if (wantKg) return roundRate(perKg);
+  if (width > 0 && height > 0) {
+    const areaSqM = (height * width) / 1_000_000;
+    const mat = calcMaterial(areaSqM, gsm, ratePerKg, 3);
+    const labour = labourForPaper(spec.pouchType, height).labourPerPouch;
+    return roundRate(mat.costPerPouch * 1.3 + labour);
+  }
+  return 0;
+}
+
+function applyRateToForm(spec, company) {
+  const quoted = lastQuotedForSpec(spec, company);
+  const single = isProductionSingleSidePouch(spec.pouchType);
+  const unit = single ? 'kg' : (quoted?.unit || defaultQtyUnit(spec.pouchType));
+  const rate = quoted?.rate || calculatedPaperRate(spec, unit);
+  if (els.quantityUnit) els.quantityUnit.value = unit;
+  if (els.rate) els.rate.value = rate > 0 ? rate : '';
+}
+
+function autofillFromCatalog() {
+  const companyName = els.companyName?.value;
+  const jobName = els.jobName?.value;
+  const company = companyByName(companyName);
+  const product = pickProductForAutofill(companyName, jobName);
+  const last = latestOrderByCompanyAndJob(companyName, jobName);
+  const spec = product || last;
+  if (!spec) return;
+  applySpecToForm(spec);
+  applyRateToForm(spec, company);
   syncProductionPouchFormUI();
 }
 
@@ -420,6 +592,7 @@ function syncProductionPouchFormUI() {
   if (els.quantityKgOnlyWrap) els.quantityKgOnlyWrap.style.display = single ? '' : 'none';
   if (els.quantityUnit && single) els.quantityUnit.value = 'kg';
   syncInkCoverageUI();
+  updateOrderTicket();
 }
 
 function fmtUnitQty(qty, unit) {
@@ -443,6 +616,58 @@ function syncInkCoverageUI() {
   if (els.inkCoverage) els.inkCoverage.disabled = plain;
   if (els.inkCoverageWrap) els.inkCoverageWrap.style.opacity = plain ? '0.55' : '';
   if (plain && els.inkCoverage) els.inkCoverage.value = 'half';
+}
+
+function ticketDash(v) {
+  const s = String(v ?? '').trim();
+  return s || '—';
+}
+
+function updateOrderTicket() {
+  const data = readForm();
+  const single = isProductionSingleSidePouch(data.pouchType);
+  const ready = !validateForm(data);
+
+  if (els.ticketRoot) els.ticketRoot.classList.toggle('is-ready', ready);
+  if (els.ticketStamp) els.ticketStamp.textContent = ready ? 'Ready' : 'Draft';
+  if (els.ticketId) els.ticketId.textContent = ticketDash(data.orderId);
+  if (els.ticketDate) els.ticketDate.textContent = ticketDash(data.orderDate);
+  if (els.ticketPo) els.ticketPo.textContent = ticketDash(data.poNumber);
+  if (els.ticketCompany) els.ticketCompany.textContent = ticketDash(data.companyName);
+  if (els.ticketJob) els.ticketJob.textContent = ticketDash(data.jobName);
+  if (els.ticketPouch) els.ticketPouch.textContent = data.pouchType ? pouchTypeLabel(data.pouchType) : '—';
+
+  if (els.ticketSize) {
+    const w = Number.isFinite(data.widthMm) ? fmtWhole(data.widthMm) : '';
+    const h = Number.isFinite(data.heightMm) && data.heightMm > 0 ? fmtWhole(data.heightMm) : '';
+    const c = Number.isFinite(data.cylinderUpMm) ? fmtWhole(data.cylinderUpMm) : '';
+    let size = '—';
+    if (w && (single || !h)) size = `${w} mm`;
+    if (w && h && !single) size = `${w} × ${h} mm`;
+    if (c && size !== '—') size += ` · cyl ${c}`;
+    else if (c) size = `cyl ${c} mm`;
+    els.ticketSize.textContent = size;
+  }
+
+  if (els.ticketPrint) {
+    const print = printTypeLabel(data.printType);
+    const face = normalizePrintKind(data.printType) === 'printed' ? inkCoverageLabel(data.inkCoverage) : '';
+    els.ticketPrint.textContent = print === '-' ? '—' : (face ? `${print} · ${face}` : print);
+  }
+
+  if (els.ticketQty) {
+    els.ticketQty.textContent = Number.isFinite(data.quantity)
+      ? fmtUnitQty(data.quantity, data.quantityUnit)
+      : '—';
+  }
+  if (els.ticketRate) {
+    els.ticketRate.textContent = Number.isFinite(data.rate) ? fmt(data.rate) : '—';
+  }
+  if (els.ticketFoot) {
+    els.ticketFoot.textContent = ready
+      ? 'Job card is complete. Save to send it to production.'
+      : 'Fill the form to complete this card.';
+  }
 }
 
 function dispatchEntries(row) {
@@ -1011,13 +1236,16 @@ function renderOrdersTable() {
 }
 
 async function refreshOrders() {
-  const all = await getProductionOrders();
+  const [all, companies, products, quotations] = await Promise.all([
+    getProductionOrders(),
+    getCompanies().catch(() => []),
+    getProducts().catch(() => []),
+    getQuotations().catch(() => []),
+  ]);
   ordersCache = Array.isArray(all) ? all : [];
-  try {
-    companiesCache = await getCompanies();
-  } catch {
-    companiesCache = [];
-  }
+  companiesCache = Array.isArray(companies) ? companies : [];
+  productsCache = Array.isArray(products) ? products : [];
+  quotationsCache = Array.isArray(quotations) ? quotations : [];
   for (const row of ordersCache) {
     if (shouldAutoCompleteOrder(row)) {
       const completedAt = new Date().toISOString();
@@ -1050,6 +1278,7 @@ async function resetFormKeepContext() {
   if (els.quantityUnit) els.quantityUnit.value = 'nos';
   syncProductionPouchFormUI();
   hideFormError();
+  updateOrderTicket();
 }
 
 async function saveOrder() {
@@ -1103,14 +1332,26 @@ function setupPageToggle() {
 function bindEvents() {
   els.companyName?.addEventListener('input', () => {
     renderJobSuggestions(els.companyName.value);
+    updateOrderTicket();
   });
   els.companyName?.addEventListener('change', () => {
     renderJobSuggestions(els.companyName.value);
-    autofillFromLastOrder();
+    autofillFromCatalog();
   });
-  els.jobName?.addEventListener('change', autofillFromLastOrder);
+  els.jobName?.addEventListener('input', updateOrderTicket);
+  els.jobName?.addEventListener('change', () => autofillFromCatalog());
   els.pouchType?.addEventListener('change', syncProductionPouchFormUI);
-  els.printType?.addEventListener('change', syncInkCoverageUI);
+  els.printType?.addEventListener('change', () => {
+    syncInkCoverageUI();
+    updateOrderTicket();
+  });
+  [
+    els.orderDate, els.poNumber, els.widthMm, els.heightMm, els.cylinderUpMm,
+    els.inkCoverage, els.rate, els.quantity, els.quantityUnit,
+  ].forEach((el) => {
+    el?.addEventListener('input', updateOrderTicket);
+    el?.addEventListener('change', updateOrderTicket);
+  });
   byId('btn-prod-save-order')?.addEventListener('click', saveOrder);
   byId('btn-prod-clear-form')?.addEventListener('click', () => {
     resetFormKeepContext();
@@ -1164,6 +1405,19 @@ function cacheElements() {
   els.jobList = byId('prod-job-list');
   els.formError = byId('prod-form-error');
   els.formErrorMsg = byId('prod-form-error-msg');
+  els.ticketRoot = document.querySelector('.prod-ticket');
+  els.ticketStamp = byId('prod-ticket-stamp');
+  els.ticketId = byId('prod-ticket-id');
+  els.ticketDate = byId('prod-ticket-date');
+  els.ticketPo = byId('prod-ticket-po');
+  els.ticketCompany = byId('prod-ticket-company');
+  els.ticketJob = byId('prod-ticket-job');
+  els.ticketPouch = byId('prod-ticket-pouch');
+  els.ticketSize = byId('prod-ticket-size');
+  els.ticketPrint = byId('prod-ticket-print');
+  els.ticketQty = byId('prod-ticket-qty');
+  els.ticketRate = byId('prod-ticket-rate');
+  els.ticketFoot = byId('prod-ticket-foot');
   els.ordersTbody = byId('prod-orders-tbody');
   els.prodTableSearch = byId('prod-table-search');
   els.prodTableStatus = byId('prod-table-status');
@@ -1186,5 +1440,6 @@ export async function initProduction() {
   syncProductionPouchFormUI();
   if (els.orderDate && !els.orderDate.value) els.orderDate.value = todayIsoDate();
   if (els.orderId && !els.orderId.value) els.orderId.value = await getNextProductionOrderId();
+  updateOrderTicket();
   await refreshOrders();
 }
